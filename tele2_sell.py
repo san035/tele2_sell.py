@@ -464,7 +464,8 @@ var ={'Min_count_for_sale_интернет':5, 'Min_count_for_sale_минуты'
       }
       }
 init_Ветка_Реестра()
-Перезапуск_Браузера('9535248000.Profiles_Firefox')
+ГлаыныйНомер = '9535248000'
+Перезапуск_Браузера(ГлаыныйНомер+'.Profiles_Firefox')
 
 xpath={'xpath_phone':'//input[@id="keycloakAuth.phone"]', 'xpath_next_login' : '//button[contains(text(),"Далее")]', 'xpath_login_with_password' : '//button[text()="Вход по паролю"]',
       'Текст_нет_активных_лотов':'//div[contains(text(), "У вас нет активных лотов в продаже.")]',
@@ -606,7 +607,7 @@ while True:
         log(f'Все продано! Ближаящая работа {time.ctime(near_data)}')
         brauzer.quit()
         time.sleep(near_data-time.localtime())
-        Перезапуск_Браузера('9535248000.Profiles_Firefox')
+        Перезапуск_Браузера(ГлаыныйНомер+'.Profiles_Firefox')
 
     log(f'Всего выставлено на продажу {var["Всего_на_продажу_минуты"]*var["Стоимость_1_ед_минуты"] + var["Всего_на_продажу_интернет"]*var["Стоимость_1_ед_интернет"]} руб. {var["Всего_на_продажу_минуты"]} минут {var["Всего_на_продажу_интернет"]} Гб')
     log(f'{time.strftime("%Y-%m-%d %H.%M.%S", time.localtime())} Пауза {var["Пауза_между_выставлений_лотов_сек"]} сек. ВсегоНомеровСПродажей={ВсегоНомеровСПродажей}')
