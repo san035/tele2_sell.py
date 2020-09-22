@@ -9,7 +9,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 import os, time, winreg, re, random, time, math, datetime, calendar, logging, pprint, winsound
 
-global brauzer, var, Current_phone
+global brauzer, var, Current_phone, last_element_html
 
 def log_start(file=__file__):
     logging.basicConfig(filename= file + ".log", format=u'%(asctime)s;  %(message)s',
@@ -103,15 +103,15 @@ def isXpath(xpath): # проверяет наличие xpath на страни�
 
 def get_url(url):
     global brauzer
-    count_try_wait = 0
-    while count_try_wait < 3:
+    count_try_wait, max_count_try_wait = 1, 3
+    while count_try_wait <= max_count_try_wait:
         try:
             brauzer.get(url) # иногда ошибка
-            if count_try_wait>0:
-                send_message_to_telegram('Успешное открытие %s попытка %d' % (url, count_try_wait))
+            if count_try_wait > 1:
+                log('Успешное открытие %s попытка %d' % (url, count_try_wait))
             return True
         except:
-            send_message_to_telegram('Ошибка открытия %s' %url, make_screenshot = True)
+            log(f'Ошибка открытия {url} попытка {count_try_wait} из {max_count_try_wait}')
             time.sleep(2)
             count_try_wait+=1
     return False
@@ -225,25 +225,28 @@ def open_url(new_url, wait_element, max_count_try=4, update=False, error_xpath=F
         #     continue
 
         # if count_try_wait>1:
-        log('url=' + url)
+        log(f'Ошибка открытия url={new_url} попытка {count_try_wait} из {max_count_try}')
 
     return False
 
-def click(xpath_el, count_try_wait_max=10):
+def click(xpath_el=None, count_try_wait_max=10):
+    global xpath_last_element_html
+    if xpath_el != None:
+        xpath_last_element_html = xpath_el
     count_try_wait=1
     while (count_try_wait <= count_try_wait_max):
         try:
-            # if isinstance(xpath_el, str):
-            el = WebDriverWait(brauzer, 8).until(expected_conditions.element_to_be_clickable((By.XPATH, xpath_el)))
+            # if isinstance(xpath_last_element_html, str):
+            el = WebDriverWait(brauzer, 8).until(expected_conditions.element_to_be_clickable((By.XPATH, xpath_last_element_html)))
             el.click()
             if count_try_wait>1:
-                log (f'Успех click {xpath_el}')
+                log (f'Успех click {xpath_last_element_html}')
             return True
         except Exception as err:
             count_try_wait += 1
-            log(f'Попытка {count_try_wait} Ошибка click {xpath_el} {err}')
+            log(f'Попытка {count_try_wait} Ошибка click {xpath_last_element_html} {err}')
             time.sleep(2)
-    log(f'Не удалось click {xpath_el}')
+    log(f'Не удалось click {xpath_last_element_html}')
     return False
 
 
@@ -618,7 +621,7 @@ while True:
         phone_format = Current_phone[0:3]+' '+Current_phone[3:6]+' '+Current_phone[6:8]+' '+Current_phone[8:10]
         if isXpath(f'//button/h1[contains(text(),"{phone_format}")]'):
             log(f'Номер {Current_phone} уже выбран из списка управляемых номеров!')
-        elif open_url(url['url_lk'], xpath['Мой_Tele2'], 2, error_xpath='//div[@class="data-unavailable-message lk-new error-message"]') and click('//span[contains(@class, "dashboard-number__icon")]') and sleep(1)\
+        elif open_url(url['url_lk'], '//span[contains(@class, "dashboard-number__icon")]', 2, error_xpath='//div[@class="data-unavailable-message lk-new error-message"]') and click() and sleep(0.8)\
             and click(f'//li/button/h3[contains(text(),"{phone_format}")]/..', 10) and wait_elements_xpath(f'//button/h1[contains(text(),"{phone_format}")]', 30) and wait_elements_xpath(xpath['Баланс'], 30):
             log(f'Успешное переключение на номер {Current_phone} баланс {xpath_last_element_text} руб.')
         else:
