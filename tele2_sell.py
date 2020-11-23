@@ -7,17 +7,49 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
-import os, time, winreg, re, random, time, math, datetime, calendar, logging, pprint, winsound, keyboard
+import os, time, winreg, re, random, time, math, datetime, calendar, logging, pprint, winsound, keyboard, shutil
 
 global brauzer, var, Current_phone, last_element_html
 
-def sleep_or_press_keyboard(seconds=10) -> None:
+def sleep_or_press_keyboard(seconds=10, wait_press_keyboard=None) -> None:
     # пауза seconds секунд, прерывается нажатием клавиши
+
+    log(f'Ожидание {seconds} секунд')
+    if wait_press_keyboard == None:
+        wait_press_keyboard = {'esc':'прервать ожидание'}
+
+    wait_press_keyboard['p']=' - пауза'
+    pause_active = False
+
+
+    for key in wait_press_keyboard:
+        log(f'  {key} {wait_press_keyboard[key]}')
+
     end_time = datetime.datetime.now() + datetime.timedelta(seconds=seconds)
-    while datetime.datetime.now() < end_time:
-        if keyboard.is_pressed('space') or keyboard.is_pressed('esc'):
-            break
+    while ((left:=(end_time - datetime.datetime.now()).seconds) > 0) or pause_active: # datetime.timedelta(0)
+        if pause_active:
+            if keyboard.is_pressed('c'):
+                end_time = datetime.datetime.now() + datetime.timedelta(seconds=left_after_pause)
+                print(' конец паузы')
+                pause_active = False
+        else:
+            for key in wait_press_keyboard:
+                if keyboard.is_pressed(key):
+                    if key == 'p':
+                        left_after_pause = left
+                        print(' пауза, c - прордолжить')
+                        time.sleep(1)
+                        pause_active = True
+                        break
+                    else:
+                        print('')
+                        log(f'Ожидания прервано {key}')
+                        return key # возвращаем нажатую клавишу
         time.sleep(0.5)
+        if not pause_active:
+            print(f'\b\b\b\b{left}', end= '')
+
+    return False
 
 def log_start(file=__file__):
     logging.basicConfig(filename= file + ".log", format=u'%(asctime)s;  %(message)s',
@@ -150,6 +182,8 @@ def ПолучитьЗначениеКлючаРеестра(КлючРеест�
         elif type(ЗначениеПоУмолчанию) is dict:
             # return eval('{' + зн + '}')
             return eval(зн)
+        elif тип == str:
+            return str(зн)
         return зн # тип int и др.
     except:
         return ЗначениеПоУмолчанию
@@ -167,6 +201,7 @@ def СохранитьЗначениеКлючаРеестра(КлючРеес�
 def Перезапуск_Браузера(profile=False):
     global brauzer
     ЗакрытьВсеНенужноеПО()
+    brauzer = None
 
     FirefoxProfile = webdriver.FirefoxProfile()
     if profile:
@@ -176,8 +211,38 @@ def Перезапуск_Браузера(profile=False):
             log(f'Профиль Firefox={profile}')
             FirefoxProfile = webdriver.FirefoxProfile(profile)     #  profile - имя файла профиля из папки (%APPDATA%\Mozilla\Firefox\Profiles\) C://Users//SkorPay//AppData//Roaming//Mozilla//Firefox//Profiles//, например 'etc7988t.default-release'
         else:
-            log(f'Нет файла спрофилем Firefox {profile} (скопировать из папки %APPDATA%\Mozilla\Firefox\Profiles\)')
+            log(f'Нет файла спрофилем Firefox {profile}') # (скопировать из папки %APPDATA%\Mozilla\Firefox\Profiles\)')
+            path_FirefoxProfile = os.environ.get('APPDATA') +  os.path.join('\Mozilla\Firefox\Profiles')
+            buttun = sleep_or_press_keyboard(500,
+                                             {'esc':f' - отмена, не использовать профиль {profile}',
+                                              '1':f' - скопировать профиль {profile} из {path_FirefoxProfile}'})
+            if not buttun or buttun == 'esc':
+                return None
 
+            #  копируем папку path_FirefoxProfile
+            # поиск нужного профиля
+            Profile_is_found = False
+            for dir in os.listdir(path_FirefoxProfile):
+                dir = os.path.join(path_FirefoxProfile, dir)
+                if os.path.isdir(dir) and os.path.splitext(dir)[1] == '.default-release':
+                    Profile_is_found = True
+                    break
+            if not Profile_is_found:
+                log(f'Не найден профиль Firefox {path_FirefoxProfile}*.default-release')
+                return None
+
+            path_FirefoxProfile = dir
+
+            log(f'Начало копирования профиля Firefox {path_FirefoxProfile} в {profile}')
+            try:
+                shutil.copytree(path_FirefoxProfile, profile)
+                log('Профиль Firefox скопирован.')
+            except Exception as err:
+                log(f'Ошибка копирования {err}.')
+                os.rmdir(path_FirefoxProfile)
+                return None
+
+    # открытие браузера
     cap = DesiredCapabilities().FIREFOX
     cap["unexpectedAlertBehaviour"] = "accept"  # для автозакрытия алертов
 
@@ -198,6 +263,7 @@ def Перезапуск_Браузера(profile=False):
     # FirefoxProfile.setEnableNativeEvents(true);
 
     brauzer = webdriver.Firefox(firefox_profile=FirefoxProfile, capabilities=cap)
+    return brauzer
 
 def open_url(new_url, wait_element, max_count_try=4, update=False, error_xpath=False): # открытие страницы оплаты
     global current_bank, brauzer
@@ -554,7 +620,7 @@ var ={'Min_count_for_sale_Гб':5, 'Min_count_for_sale_минуты':100, 'Ма�
       }
       }
 init_Ветка_Реестра()
-ГлаыныйНомер = '9535248000'
+Profile_FireFox_default = 'Profiles_Firefox'
 if __name__ == '__main__':
     xpath={'xpath_phone':'//input[@id="keycloakAuth.phone"]', 'xpath_next_login' : '//button[contains(text(),"Далее")]', 'xpath_login_with_password' : '//button[text()="Вход по паролю"]',
           'Текст_нет_активных_лотов':'//div[contains(text(), "У вас нет активных лотов в продаже.")]',
@@ -603,7 +669,7 @@ if __name__ == '__main__':
     _today = str(datetime.datetime.today())[:10]
 
     for Current_phone in var["Телефоны"].keys():
-        ПродаватьС = ПолучитьЗначениеКлючаРеестра(Current_phone+'ПродаватьС', "")
+        ПродаватьС = ПолучитьЗначениеКлючаРеестра(Current_phone+'ПродаватьС', "", str)
         if ПродаватьС <= _today:
             ПродаватьС = ''
         var["Телефоны"][Current_phone]['ПродаватьС'] = ПродаватьС
@@ -626,7 +692,10 @@ if __name__ == '__main__':
         if var["Телефоны"][Current_phone].get('ЧасНачалаТорговли', None)  == None or var["Телефоны"][Current_phone].get('ЧасКонцаТорговли', None) == None:
             var["Телефоны"][Current_phone]['ЧасНачалаТорговли'] = ''
             var["Телефоны"][Current_phone]['ЧасКонцаТорговли'] = '24'
-    brauzer = None
+        var["Телефоны"][Current_phone]['brauzer'] = None
+        var["Телефоны"][Current_phone]['Profile_FireFox'] = Profile_FireFox_default
+        var[Profile_FireFox_default] = None
+
     while True:
         ВсегоНомеровСПродажей = var["Всего_на_продажу_Гб"] = var["Всего_на_продажу_минуты"] = 0
 
@@ -641,10 +710,19 @@ if __name__ == '__main__':
                  brauzer = None
              sleep_or_press_keyboard(До_начала*3600)
              continue
-        if brauzer == None:
-            Перезапуск_Браузера(ГлаыныйНомер + '.Profiles_Firefox')
 
         for Current_phone in var["Телефоны"].keys():
+
+            # запуск браузера по профилю
+            Profile_FireFox = var["Телефоны"][Current_phone]['Profile_FireFox']
+            brauzer = var[Profile_FireFox]
+            if brauzer == None:
+                var[Profile_FireFox] = Перезапуск_Браузера(Profile_FireFox)
+                if brauzer == None:
+                    log(f'Для {Current_phone} не удалось открыть браузер с профилем {Profile_FireFox}')
+                    sleep_or_press_keyboard(300, wait_press_keyboard = {'esc':'для досрочного продолжения'})
+                    continue
+
             phone_enable, sell_with=var["Телефоны"][Current_phone]['Активная_симка'] , var["Телефоны"][Current_phone].get('ПродаватьС', '')
             log(f'Начало переключения на номер {Current_phone} {var["Телефоны"][Current_phone]["Name"]} Активность:{phone_enable} использовать с: {sell_with} ОбновитьОстатки={var["Телефоны"][Current_phone]["ОбновитьОстатки"]}')
             phone_enable = (phone_enable and (_today >= sell_with))\
@@ -654,7 +732,7 @@ if __name__ == '__main__':
                 continue
 
             if not open_url(url['url_lk'], xpath['Войти']+';' + xpath['xpath_phone'] + ';' + xpath['Мой_Tele2'], 2):
-                sleep_or_press_keyboard(600)
+                sleep_or_press_keyboard(600, {'c':' -  скопировать с про'})
 
                 continue
 
@@ -785,4 +863,4 @@ if __name__ == '__main__':
         log(f'Пауза {СекДоЗапуска} сек. ВсегоНомеровСПродажей={ВсегоНомеровСПродажей}')
         sleep_or_press_keyboard(СекДоЗапуска)
         if ВсегоНомеровСПродажей == 0:
-            Перезапуск_Браузера(ГлаыныйНомер+'.Profiles_Firefox')
+            Перезапуск_Браузера(Profile_FireFox_default)
