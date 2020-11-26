@@ -1,3 +1,4 @@
+# coding: utf8
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.firefox.options import Options
@@ -7,7 +8,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
-import os, time, winreg, re, random, time, math, datetime, calendar, logging, pprint, winsound, keyboard, shutil
+import os, time, winreg, re, random, time, math, datetime, calendar, logging, pprint, winsound, keyboard, pandas as pd
+# pip3 install selenium keyboard pandas
 
 global brauzer, var, Current_phone, last_element_html
 
@@ -50,6 +52,7 @@ def sleep_or_press_keyboard(seconds=10, wait_press_keyboard=None) -> None:
         if not pause_active:
             print(f'\b\b\b\b{left}', end= '')
 
+    print(f'\b\b\b\b', end='')
     return False
 
 def log_start(file=__file__):
@@ -213,35 +216,8 @@ def Перезапуск_Браузера(profile=False):
             FirefoxProfile = webdriver.FirefoxProfile(profile)     #  profile - имя файла профиля из папки (%APPDATA%\Mozilla\Firefox\Profiles\) C://Users//SkorPay//AppData//Roaming//Mozilla//Firefox//Profiles//, например 'etc7988t.default-release'
         else:
             log(f'Нет файла спрофилем Firefox {profile}') # (скопировать из папки %APPDATA%\Mozilla\Firefox\Profiles\)')
-            path_FirefoxProfile = os.environ.get('APPDATA') +  os.path.join('\Mozilla\Firefox\Profiles')
-            buttun = sleep_or_press_keyboard(500,
-                                             {'esc':f' - отмена, не использовать профиль {profile}',
-                                              '1':f' - скопировать профиль {profile} из {path_FirefoxProfile}'})
-            if not buttun or buttun == 'esc':
-                return None
+            return None
 
-            #  копируем папку path_FirefoxProfile
-            # поиск нужного профиля
-            Profile_is_found = False
-            for dir in os.listdir(path_FirefoxProfile):
-                dir = os.path.join(path_FirefoxProfile, dir)
-                if os.path.isdir(dir) and os.path.splitext(dir)[1] == '.default-release':
-                    Profile_is_found = True
-                    break
-            if not Profile_is_found:
-                log(f'Не найден профиль Firefox {path_FirefoxProfile}*.default-release')
-                return None
-
-            path_FirefoxProfile = dir
-
-            log(f'Начало копирования профиля Firefox {path_FirefoxProfile} в {profile}')
-            try:
-                shutil.copytree(path_FirefoxProfile, profile)
-                log('Профиль Firefox скопирован.')
-            except Exception as err:
-                log(f'Ошибка копирования {err}.')
-                os.rmdir(path_FirefoxProfile)
-                return None
 
     # открытие браузера
     cap = DesiredCapabilities().FIREFOX
@@ -347,12 +323,14 @@ def Press_Button(xpath_Button, sleep_after=0.3, wait_sec=2, Попыток=2):
             #    wait.until(EC.invisibility_of_element_located((By.XPATH, "//div[@class='blockUI blockOverlay']"))) and then el_xp("//input[@value='Save']").click()
             #  WebDriverWait(brauzer, 8).until(last_element_html.invisibility_of_element_located((By.XPATH, xpath_last_element_html))) and then el_xp("//input[@value='Save']").click()
 
-            # log (f'Нажато {xpath_last_element_html}')
+            if Попытка > 0:
+                log (f' {Попытка+1}/{Попыток} успех')
+
             if sleep_after:
                 time.sleep(sleep_after)
             return True
         except Exception as err:
-            log(f'Ошибка click {xpath_Button} {err} попытка {Попытка}')
+            log(f' {Попытка+1}/{Попыток} Ошибка click {xpath_Button} {err}')
             time.sleep(1)
     return False
 
@@ -430,53 +408,27 @@ def Число(str): #строка в число
     return int(match[0]) if match else 0
 
 
-def Получить_доступные_остатки():
+def Получить_доступные_остатки(): # чтение остатков Гб и Минут
     global var, Current_phone, xpath_last_element_text
 
+    if not open_url(url['url_lk'], xpath['Остатки_lk_минуты']+';'+xpath['Остатки_lk_Гб']+';//h2[text()="Доступно"]'):
+        return False
+
+    time.sleep(1)
+
     ОстакиПрочитаны = False
-    СпособыПолученяОстатков=['lk'] # ,'НаАватаре'
-    for СпособПолученияОстатков in СпособыПолученяОстатков:
-        if СпособПолученияОстатков == 'НаАватаре':
-            if not isXpath(xpath['icon-profile']): # icon-profile Мой_Tele2_номер
-                open_url(url['url_Мои_лоты'], xpath['Войти']+';'+xpath['Мой_Tele2'], 2, update=True)
-
-            if not Press_Button(xpath['icon-profile']) :
-                log ('Остатки Гб и Мин не прочитаны.')
-                break
-
-            ActionChains(brauzer).move_to_element(last_element_html).perform() # наведение
-            time.sleep(0.1)
-
-        elif СпособПолученияОстатков=='lk':
-            if not open_url(url['url_lk'], xpath['Остатки_lk_минуты']+';'+xpath['Остатки_lk_Гб']+';//h2[text()="Доступно"]'):
-                break
-            time.sleep(3)
-            if isXpath(xpath['Баланс']):
-                var["Телефоны"][Current_phone]['Баланс']=float(xpath_last_element_text.replace(' ', '').replace('₽', '').replace(',', '.'))
-                var["Телефоны"][Current_phone]['Баланс_дата'] = str(datetime.datetime.today())[:10]
-
-                if var["Телефоны"][Current_phone].get('Абонплата', 0) <= 0 and isXpath(xpath['Абонплата']):
-                    rez_match = re.search('(Абонентская плата )(.+)( ₽ будет списана )(\d+)', xpath_last_element_text)
-                    if rez_match:
-                        var["Телефоны"][Current_phone]['Абонплата'] = float(rez_match.group(2))
-                        var["Телефоны"][Current_phone]['День_обновления_остатков'] = int(rez_match.group(4))
-
-
-        for Resource_for_sale in ['минуты', 'Гб']:
-            key_остатки = f'Остатки_{Resource_for_sale}'
-            if isXpath(xpath[f'Остатки_{СпособПолученияОстатков}_{Resource_for_sale}']):
-                var["Телефоны"][Current_phone][key_остатки]= Число(xpath_last_element_text.replace(' ', ''))
+    for Resource_for_sale in ['минуты', 'Гб']:
+        key_остатки = f'Остатки_{Resource_for_sale}'
+        if isXpath(xpath[f'Остатки_lk_{Resource_for_sale}']):
+            var["Телефоны"][Current_phone][key_остатки]= Число(xpath_last_element_text.replace(' ', ''))
+            ОстакиПрочитаны = True
+        else:
+            if Resource_for_sale == 'Гб' and isXpath('//a[contains(text(),"Подключить пакет интернета")]'):
                 ОстакиПрочитаны = True
-            else:
-                if Resource_for_sale == 'Гб' and isXpath('//a[contains(text(),"Подключить пакет интернета")]'):
-                    ОстакиПрочитаны = True
-                var["Телефоны"][Current_phone].update({key_остатки:0})
-                # log(f'Не удалось прочитать остатки {Current_phone} методом {СпособПолученияОстатков}')
-                # break
+            var["Телефоны"][Current_phone].update({key_остатки:0})
 
-        if ОстакиПрочитаны:
-            var["Телефоны"][Current_phone]['ОбновитьОстатки']=False
-            break
+    if ОстакиПрочитаны:
+        var["Телефоны"][Current_phone]['ОбновитьОстатки']=False
 
     log(f'Остатки {Current_phone} {var["Телефоны"][Current_phone]["Остатки_Гб"]} Гб {var["Телефоны"][Current_phone]["Остатки_минуты"]} Мин. Не продавать {var["Телефоны"][Current_phone]["Оставлять_Гб"]} Гб {var["Телефоны"][Current_phone]["Оставлять_минуты"]} Мин.' )
     return ОстакиПрочитаны
@@ -531,7 +483,9 @@ def ВыставитьЛоты(Resource_for_sale):
             var["Телефоны"][Current_phone][f'Остатки_{Resource_for_sale}'] -= количество_для_продажи
 
             # сохранение кол-ва выставленных лотов в день
-            КлючРеестра = Current_phone+'_'+_today+'_Выставлено_лотов'
+            КлючРеестра = _today+'_Выставлено_лотов'
+            СохранитьЗначениеКлючаРеестра(КлючРеестра, ПолучитьЗначениеКлючаРеестра(КлючРеестра, 0, int) + 1, winreg.REG_DWORD)
+            КлючРеестра = Current_phone + КлючРеестра
             СохранитьЗначениеКлючаРеестра(КлючРеестра, ПолучитьЗначениеКлючаРеестра(КлючРеестра, 0, int) + 1, winreg.REG_DWORD)
         else:
             log ('Ошибка выставления лота')
@@ -585,9 +539,10 @@ var ={'Min_count_for_sale_Гб':5, 'Min_count_for_sale_минуты':50, 'Мак
        'Пауза_между_выставлений_лотов_сек':500,
       "Откуда_дарить_Гб":["9535248000", "9012998490"], 'Кому_дарить_Гб':[],
       "Телефоны":{
+      # '9535248000': {'Активная_симка': True, 'Name': 'Александр', 'Оставлять_минуты': 400, 'Оставлять_Гб': 14, 'День_обновления_остатков': 17, 'Абонплата': 500, 'Описание': 'Вологда 35ГБ, 700 минут', 'ЛС': '9535248000'},
+
       # '9019861431': {'Активная_симка': True, 'Name': 'Дима', 'Оставлять_минуты': 190, 'Оставлять_Гб': 19, 'День_обновления_остатков': 12, 'Абонплата': 300, 'Описание': 'Ярославль  40 ГБ, 800 минут', 'ПродаватьДоБаланса':0},
       # '9005093361': {'Активная_симка': True, 'Name': 'Александр', 'Оставлять_минуты': 300, 'Оставлять_Гб': 5, 'День_обновления_остатков': 12, 'Абонплата': 500, 'Описание': 'Вологда 35 ГБ, 700 минут', 'ЛС': '9535248000', 'ЧасКонцаТорговли':'23', 'ЧасНачалаТорговли':'19'},
-      # '9535248000': {'Активная_симка': True, 'Name': 'Александр', 'Оставлять_минуты': 400, 'Оставлять_Гб': 14, 'День_обновления_остатков': 17, 'Абонплата': 500, 'Описание': 'Вологда 35ГБ, 700 минут', 'ЛС': '9535248000'},
       # '9005033469': {'Активная_симка': True, 'Name': 'Александр', 'Оставлять_минуты': 0, 'Оставлять_Гб': 0, 'День_обновления_остатков': 19, 'Абонплата': 500, 'Описание': 'Вологда 35 ГБ, 700 минут', 'ЛС': '9535248000'},
       # '9922874211': {'Активная_симка': True, 'Name': 'Александр', 'Оставлять_минуты': 300, 'Оставлять_Гб': 1, 'День_обновления_остатков': 26, 'Абонплата': 400, 'Описание': 'Вологда 25 ГБ, 600 минут', 'ЛС': '9535248000'},
       # '9005424360': {'Активная_симка': True, 'Name': 'Александр', 'Оставлять_минуты': 0, 'Оставлять_Гб': 5, 'День_обновления_остатков': 29, 'Абонплата': 500, 'Описание': 'поменять Вологда 35 ГБ, 700 минут', 'ЛС': '9535248000'},
@@ -605,7 +560,7 @@ var ={'Min_count_for_sale_Гб':5, 'Min_count_for_sale_минуты':50, 'Мак
       # #
       # '9535202353': {'Активная_симка': True, 'Name': 'Руслан', 'Оставлять_минуты': 600, 'Оставлять_Гб': 5, 'День_обновления_остатков': 20, 'Абонплата': 400, 'Описание': 'Вологда  25ГБ,  600 минут', 'ЛС': ''},
       #
-      '9005491033':{'Активная_симка':True, 'Name':'Орлов Стекольный modem', 'Оставлять_минуты':0, 'Оставлять_Гб':3, 'День_обновления_остатков':19, 'Абонплата':300, 'Описание':'Вологда 15 ГБ, 350 минут', 'ЛС': '9005072994'},
+      '9005491033':{'Активная_симка':True, 'Name':'Орлов Стекольный modem', 'Оставлять_минуты':0, 'Оставлять_Гб':3, 'День_обновления_остатков':19, 'Абонплата':300, 'Описание':'Вологда 15 ГБ, 350 минут', 'ЛС': '9005072994', 'Телефон ЛК':'9535248000'},
       '9005507677':{'Активная_симка':True, 'Name':'Орлов Лакомка modem', 'Оставлять_минуты':0, 'Оставлять_Гб':5, 'День_обновления_остатков':25, 'Абонплата':500, 'Описание':'Вологда 35 ГБ, 700 минут', 'ЛС': '9005072994'},
       '9535208906':{'Активная_симка':True, 'Name':'Орлов Универма modem', 'Оставлять_минуты':0, 'Оставлять_Гб':5, 'День_обновления_остатков':25, 'Абонплата':500, 'Описание':'Вологда 35 ГБ, 700 минут +', 'ЛС': '9005072994'},
 
@@ -620,8 +575,14 @@ var ={'Min_count_for_sale_Гб':5, 'Min_count_for_sale_минуты':50, 'Мак
           # '9005369460':{'Активная_симка':False, 'Name':'Дворецкая София Николаевна', 'Оставлять_минуты':150, 'Оставлять_Гб':3,'День_обновления_остатков':30},
       }
       }
+
+
+#
+# df = pd.concat({k: pd.Series(v) for k, v in data.items()}).reset_index()
+# df.columns = ['dict_index', 'name','quantity']
+# print(df)
+
 init_Ветка_Реестра()
-Profile_FireFox_default = 'Profiles_Firefox'
 if __name__ == '__main__':
     xpath={'xpath_phone':'//input[@id="keycloakAuth.phone"]', 'xpath_next_login' : '//button[contains(text(),"Далее")]', 'xpath_login_with_password' : '//button[text()="Вход по паролю"]',
           'Текст_нет_активных_лотов':'//div[contains(text(), "У вас нет активных лотов в продаже.")]',
@@ -658,16 +619,10 @@ if __name__ == '__main__':
          'url_lk':'https://yar.tele2.ru/lk'
          }
 
-
-    СохранитьЗначениеКлючаРеестра('login', '9535248000')
-    # СохранитьЗначениеКлючаРеестра('password', '')
-    phone = ПолучитьЗначениеКлючаРеестра('login', '9535248000')
-    # password = "" #ПолучитьЗначениеКлючаРеестра('password', '')
-
-
     # восстановление из реестра
     Список_ЛС = {}
     _today = str(datetime.datetime.today())[:10]
+    phone_lk_default = list(var["Телефоны"].keys())[0] # Первый телефон - логин авторизации
 
     for Current_phone in var["Телефоны"].keys():
         ПродаватьС = ПолучитьЗначениеКлючаРеестра(Current_phone+'ПродаватьС', "", str)
@@ -694,8 +649,14 @@ if __name__ == '__main__':
             var["Телефоны"][Current_phone]['ЧасНачалаТорговли'] = ''
             var["Телефоны"][Current_phone]['ЧасКонцаТорговли'] = '24'
         var["Телефоны"][Current_phone]['brauzer'] = None
-        var["Телефоны"][Current_phone]['Profile_FireFox'] = Profile_FireFox_default
-        var[Profile_FireFox_default] = None
+        phone_lk = var["Телефоны"][Current_phone]['Телефон ЛК'] = var["Телефоны"][Current_phone].get('Телефон ЛК', phone_lk_default)
+        if phone_lk != phone_lk_default:
+            phone_lk_default = phone_lk # если не задан 'Телефон ЛК' то возьмется последний 'Телефон ЛК'
+        var["Телефоны"][Current_phone]['Profile_FireFox'] = name_Profile_FireFox = phone_lk + '.' + 'Profile_FireFox' # имя профиля FireFox
+        var[name_Profile_FireFox] = None # очищаем ссылку на selenium
+        if var["Телефоны"][Current_phone].get("Баланс", None) == None:
+            var["Телефоны"][Current_phone]["Баланс"]=0
+
 
     while True:
         ВсегоНомеровСПродажей = var["Всего_на_продажу_Гб"] = var["Всего_на_продажу_минуты"] = 0
@@ -725,7 +686,7 @@ if __name__ == '__main__':
                     continue
 
             phone_enable, sell_with=var["Телефоны"][Current_phone]['Активная_симка'] , var["Телефоны"][Current_phone].get('ПродаватьС', '')
-            log(f'Начало переключения на номер {Current_phone} {var["Телефоны"][Current_phone]["Name"]} Активность:{phone_enable} использовать с: {sell_with} ОбновитьОстатки={var["Телефоны"][Current_phone]["ОбновитьОстатки"]}')
+            log(f'Начало переключения на номер {Current_phone} {var["Телефоны"][Current_phone]["Name"]} {var["Телефоны"][Current_phone]["Баланс"]}р Активность:{phone_enable} использовать с: {sell_with} ОбновитьОстатки={var["Телефоны"][Current_phone]["ОбновитьОстатки"]}')
             phone_enable = (phone_enable and (_today >= sell_with))\
                          and var["Телефоны"][Current_phone]['ЧасНачалаТорговли'] <= ЧасТорговли <= var["Телефоны"][Current_phone]['ЧасКонцаТорговли']
             ЕстьКомуДаритьГб = len(var["Кому_дарить_Гб"])>0 and Current_phone in var["Откуда_дарить_Гб"] and var["Телефоны"][Current_phone].get("Остатки_Гб", -1) != 0
@@ -737,10 +698,10 @@ if __name__ == '__main__':
 
                 continue
 
-            if xpath_last_element_html in [xpath['Войти'], xpath['xpath_phone']]:
-                #  авторизация
+            if xpath_last_element_html in [xpath['Войти'], xpath['xpath_phone']]:                 #  авторизация
+                log(f'Телефон для авторизации {var["Телефоны"][Current_phone]["Телефон ЛК"]}')
                 if (isXpath(xpath['xpath_phone']) or Press_Button('Войти', 1)) \
-                        and Past_Value('xpath_phone', phone, 0.5) \
+                        and Past_Value('xpath_phone', var["Телефоны"][Current_phone]["Телефон ЛК"], 0.5) \
                         and Press_Button('xpath_next_login', 5):
                     #         and Press_Button('//button[text()="Вход по паролю"]', 1) \
                     #         and Past_Value('//input[@id="keycloakAuth.password"]', password, 0.5):
@@ -755,7 +716,17 @@ if __name__ == '__main__':
                 log(f'Номер {Current_phone} уже выбран из списка.') #  управляемых номеров
             elif open_url(url['url_lk'], '//span[contains(@class, "dashboard-number__icon")]', 2, error_xpath='//div[@class="data-unavailable-message lk-new error-message"]') and click() and sleep(0.8)\
                 and click(f'//li/button/h3[contains(text(),"{phone_format}")]/..', 10) and wait_elements_xpath(f'//button/h1[contains(text(),"{phone_format}")]', 30) and wait_elements_xpath(xpath['Баланс'], 30):
+                var["Телефоны"][Current_phone]['Баланс']=float(xpath_last_element_text.replace(' ', '').replace(',', '.')) #.replace('₽', '')
+                var["Телефоны"][Current_phone]['Баланс_дата'] = _today
                 log(f'Успешное переключение на номер {Current_phone} баланс {xpath_last_element_text} руб.')
+
+                # обновление Абонплата
+                if var["Телефоны"][Current_phone].get('Абонплата', 0) <= 0 and isXpath(xpath['Абонплата']):
+                    rez_match = re.search('(Абонентская плата )(.+)( ₽ будет списана )(\d+)', xpath_last_element_text)
+                    if rez_match:
+                        var["Телефоны"][Current_phone]['Абонплата'] = float(rez_match.group(2))
+                        var["Телефоны"][Current_phone]['День_обновления_остатков'] = int(rez_match.group(4))
+
             else:
                 log(f'Неудалось переключиться на номер {Current_phone}. Переход к следущему номеру черех 3 минуты.')
                 sleep_or_press_keyboard(180)
@@ -794,7 +765,7 @@ if __name__ == '__main__':
                 time.sleep(1)
                 continue
 
-            Удаление_всех_лотов(10)
+            Удаление_всех_лотов(40)
 
 
 
@@ -839,9 +810,8 @@ if __name__ == '__main__':
             for Current_phone in var["Телефоны"][ЛС]['ПочиненныеНомера']:
                 sell_with = min(sell_with, var["Телефоны"][Current_phone].get('ПродаватьС', ''))
                 var["Телефоны"][ЛС]['Абонплата_ЛС'] += abs(var["Телефоны"][Current_phone].get('Абонплата', 0))
-            Баланс = var["Телефоны"][ЛС].get("Баланс", 0)
-            text = f'ЛС {ЛС} {var["Телефоны"][ЛС]["Name"]} общий баланс: {Баланс} общая абонплата: {var["Телефоны"][ЛС]["Абонплата_ЛС"]} подчиненные {var["Телефоны"][ЛС]["ПочиненныеНомера"]}'
-            ИзлишекБаланса = var["Телефоны"][ЛС]['Абонплата_ЛС'] - Баланс
+            text = f'ЛС {ЛС} {var["Телефоны"][ЛС]["Name"]} общий баланс: {var["Телефоны"][ЛС]["Баланс"]} общая абонплата: {var["Телефоны"][ЛС]["Абонплата_ЛС"]} подчиненные {var["Телефоны"][ЛС]["ПочиненныеНомера"]}'
+            ИзлишекБаланса = var["Телефоны"][ЛС]['Абонплата_ЛС'] - var["Телефоны"][ЛС]["Баланс"]
             if  0 < ИзлишекБаланса:
                 text = f'!!!! Недостаточно {int(abs(ИзлишекБаланса))} для ' +  text
             log(text)
@@ -863,5 +833,3 @@ if __name__ == '__main__':
 
         log(f'Пауза {СекДоЗапуска} сек. ВсегоНомеровСПродажей={ВсегоНомеровСПродажей}')
         sleep_or_press_keyboard(СекДоЗапуска)
-        if ВсегоНомеровСПродажей == 0:
-            Перезапуск_Браузера(Profile_FireFox_default)
