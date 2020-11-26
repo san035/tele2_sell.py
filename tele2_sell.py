@@ -542,7 +542,7 @@ var ={'Min_count_for_sale_Гб':5, 'Min_count_for_sale_минуты':50, 'Мак
 
 init_Ветка_Реестра()
 
-if __name__ == '__main__'
+if __name__ == '__main__':
 
     # загрузка настроек
     name_csv_phones_cfg = 'phones_cfg.csv'  # имя файла с настройками по телефонам
