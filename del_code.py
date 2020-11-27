@@ -83,17 +83,6 @@ for СпособПолученияОстатков in СпособыПолуче
 
 ----------------
 
-# конвертирование словаря в pandas
-# columns = list(var["Телефоны"]['9535248000'].keys())
-# data_phones = []
-# for phone in var["Телефоны"]:
-#     line_data = [phone]
-#     for key_data_phone in columns:
-#         line_data.append(var["Телефоны"][phone].get(key_data_phone, None))
-#     data_phones.append(line_data)
-# columns.insert(0, 'Телефон')
-# df = pd.DataFrame(data_phones, columns=columns)
-# df.to_csv(name_csv, index=False)
 
 ------------
 # if var["Телефоны"][Current_phone].get('ЧасНачалаТорговли', '')  == '' or var["Телефоны"][Current_phone].get('ЧасКонцаТорговли', '') == '':
