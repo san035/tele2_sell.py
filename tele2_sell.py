@@ -1,19 +1,19 @@
 # coding: utf8
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-from selenium.webdriver.firefox.options import Options
-from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
+# from selenium.webdriver.firefox.options import Options
+# from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.action_chains import ActionChains
-import os, time, winreg, re, random, time, math, datetime, calendar, logging, pprint, winsound, keyboard, pandas as pd
+# from selenium.webdriver.common.action_chains import ActionChains
+import os, time, winreg, re, random, math, datetime, calendar, logging, pprint, winsound, keyboard, pandas as pd
 # pip3 install selenium keyboard pandas
 
 global brauzer, var, Current_phone, last_element_html
 
-def sleep_or_press_keyboard(seconds=10, wait_press_keyboard=None) -> None:
+def sleep_or_press_keyboard(seconds=10, wait_press_keyboard=None) -> bool:
     # пауза seconds секунд, прерывается нажатием клавиши
 
     print(f'Ожидание {seconds} секунд ', end= '')
@@ -215,7 +215,7 @@ def Перезапуск_Браузера(profile=False):
             log(f'Профиль Firefox={profile}')
             FirefoxProfile = webdriver.FirefoxProfile(profile)     #  profile - имя файла профиля из папки (%APPDATA%\Mozilla\Firefox\Profiles\) C://Users//SkorPay//AppData//Roaming//Mozilla//Firefox//Profiles//, например 'etc7988t.default-release'
         else:
-            log(f'Нет файла спрофилем Firefox {profile}') # (скопировать из папки %APPDATA%\Mozilla\Firefox\Profiles\)')
+            log(f'Нет папки профиля Firefox {profile}') # (скопировать из папки %APPDATA%\Mozilla\Firefox\Profiles\)')
             return None
 
 
@@ -312,9 +312,9 @@ def Press_Button(xpath_Button, sleep_after=0.3, wait_sec=2, Попыток=2):
                 time.sleep(0.1)
                 break
             time.sleep(1)
-    for Попытка in range(Попыток):
+    for number_try in range(Попыток):
         try:
-            if Попытка>0:
+            if number_try>0:
                 last_element_html = WebDriverWait(brauzer, 8).until(expected_conditions.element_to_be_clickable((By.XPATH, xpath_last_element_html)))
                 # el_xp(xpath_last_element_html).click()
             # else:
@@ -322,15 +322,15 @@ def Press_Button(xpath_Button, sleep_after=0.3, wait_sec=2, Попыток=2):
             #    wait.until(EC.invisibility_of_element_located((By.XPATH, "//div[@class='blockUI blockOverlay']"))) and then el_xp("//input[@value='Save']").click()
             #  WebDriverWait(brauzer, 8).until(last_element_html.invisibility_of_element_located((By.XPATH, xpath_last_element_html))) and then el_xp("//input[@value='Save']").click()
 
-            if Попытка > 0:
-                log (f' {Попытка+1}/{Попыток} успех')
+            if number_try > 0:
+                log (f' {number_try+1}/{Попыток} успех')
 
             if sleep_after:
                 time.sleep(sleep_after)
             return True
         except Exception as err:
-            log(f' {Попытка+1}/{Попыток} Ошибка click {xpath_Button} {err}')
-            time.sleep(1)
+            log(f' {number_try+1}/{Попыток} Ошибка click {xpath_Button} {err}')
+            time.sleep(5)
     return False
 
 def sleep(sec):
@@ -453,7 +453,7 @@ def ВыставитьЛоты(Resource_for_sale):
         return False
 
     var["Телефоны"][Current_phone]['Выставлное_количествo_'+Resource_for_sale]=ПолучитьЗначениеКлючаРеестра(Current_phone+'_Выставленное_количествo_'+Resource_for_sale, 0, int)
-    Подписаться = var["Телефоны"][Current_phone].get('Подписаться', False)
+    Подписаться = var["Телефоны"][Current_phone]['Подписаться']
     while  1:
         макс_количествo = Остатки_Ресурса-var["Телефоны"][Current_phone]['Выставлное_количествo_'+Resource_for_sale]
         if макс_количествo < var['Min_count_for_sale_'+Resource_for_sale]:
@@ -470,9 +470,10 @@ def ВыставитьЛоты(Resource_for_sale):
                 and Press_Button('Подготовка_к_вводу_Суммы') \
                 and Past_Value('Сформировать_лот_Поле_Сумма', сумма_продажи)  \
                 and Press_Button('Кнопка_Продолжить', 3) \
-                and Press_Button('Кнопка_Продолжить', 3) :
+                and Press_Button('Кнопка_Продолжить', 3) \
+                and ((not Подписаться) or Press_Button('Подписаться_как')):
             # and Press_Button('Сформировать_лот_Smile2') and Press_Button('Сформировать_лот_Smile2')
-            # and Press_Button('Сформировать_лот_Smile2', 0.5, 60)  and ((not Подписаться) or Press_Button('Подписаться_как'))\
+            # and Press_Button('Сформировать_лот_Smile2', 0.5, 60)
 
             log (f'Выставлен лот {Resource_for_sale} {количество_для_продажи} осталось {макс_количествo-количество_для_продажи}')
             var["Телефоны"][Current_phone]['Выставлное_количествo_'+Resource_for_sale] += количество_для_продажи
@@ -526,7 +527,24 @@ def ВремяДоНачалаТоргов(ТекЧас, ЧасНачалаТо�
             return 0
 
 
-             # Начало программы -------------------------------------------------------------------------------------------------------------------------------
+def dict_phones_to_csv(name_csv_phones_cfg = 'phones_cfg.csv'):  # конвертирование словаря в pandas
+    dict_for_save = var["Телефоны"]
+
+    # no_save_colu = ['brauzer','Profile_FireFox','Остатки_минуты	Остатки_Гб','Выставлное_количествo_Гб','Выставлное_количествo_минуты']
+    columns = ['Приоритет','Баланс','Баланс_дата','Абонплата','ПродаватьС','Активная_симка','Name','Оставлять_минуты','Оставлять_Гб','День_обновления_остатков','Описание','ЛС','Телефон_ЛК','ПродаватьДоБаланса','ЧасКонцаТорговли','ЧасНачалаТорговли','Подписаться','Остатки_минуты','Остатки_Гб','Выставлное_количествo_Гб','Выставлное_количествo_минуты']
+               #list(dict_for_save['9535248000'].keys()) - no_save_columns
+
+    data_phones = []
+    for phone in dict_for_save:
+        line_data = [phone]
+        for key_data_phone in columns:
+             line_data.append(dict_for_save[phone].get(key_data_phone, None))
+        data_phones.append(line_data)
+    columns.insert(0, 'Телефон')
+    df = pd.DataFrame(data_phones, columns=columns)
+    df.to_csv(name_csv_phones_cfg, index=False, sep=';', )
+
+# Начало программы -------------------------------------------------------------------------------------------------------------------------------
 #             Смнетить тариф можно только звонком в Теле2 или USSD-командой: *630*(количество минут)*(количество ГБ)#
 # Условия текущего тарифа - *107#
 # для ЯО "Мой онлайн" 250 руб, 25 ГБ, 800 минут *630*800*25#
@@ -540,33 +558,44 @@ var ={'Min_count_for_sale_Гб':5, 'Min_count_for_sale_минуты':50, 'Мак
       }
 
 
-init_Ветка_Реестра()
+init_Ветка_Реестра() # загрузка настроек
 
-if __name__ == '__main__':
-
-    # загрузка настроек
-    name_csv_phones_cfg = 'phones_cfg.csv'  # имя файла с настройками по телефонам
-    def pd_converters_str(var):
+def load_cfg(name_csv_phones_cfg = 'phones_cfg.csv'):
+      # имя файла с настройками по телефонам
+    def to_str(var):
         # print(var)
         return var
 
-    def pd_converters_bool(var):
+    def to_bool(var):
         if type(var) != bool:
             return False
         return var
 
-    def pd_converters_int(var):
+    def to_int(var):
         if type(var) != int:
             return 0
         return var
 
+    def to_float(var):
+        if type(var) != float:
+            return 0
+        return var
     try:
-        df = pd.read_csv(name_csv_phones_cfg, dtype={'Телефон': str}, converters={'ЛС': pd_converters_str, 'Телефон ЛК': pd_converters_str, 'Подписаться': pd_converters_bool, 'ЧасКонцаТорговли': pd_converters_str, 'ЧасНачалаТорговли': pd_converters_str, 'ПродаватьДоБаланса': pd_converters_int})
+        df = pd.read_csv(name_csv_phones_cfg, sep=';',
+                         dtype={'Телефон': str},
+                         converters={'ЛС': to_str, 'ПродаватьС':to_str, 'Телефон_ЛК': to_str, 'Баланс_дата':to_str, 'Подписаться': to_bool, 'ЧасКонцаТорговли': to_str, 'ЧасНачалаТорговли': to_str, 'ПродаватьДоБаланса': to_int, 'Баланс':to_float, 'Остатки_минуты': to_int,'Остатки_Гб': to_int,'Выставлное_количествo_Гб': to_int,'Выставлное_количествo_минуты': to_int})
     except Exception as err:
         log(f'Ошибка загрузки файла {name_csv_phones_cfg} {err}')
         exit(0)
+    df = df.sort_values(by=['Активная_симка','Приоритет', 'Телефон']) #
     df.set_index('Телефон', inplace=True)  # переназначение индекса
+    print(df.head(100).to_string())
+
     var["Телефоны"] = df.to_dict('index')
+
+if __name__ == '__main__':
+
+    load_cfg() # загрузка настроек
 
     xpath={'xpath_phone':'//input[@id="keycloakAuth.phone"]', 'xpath_next_login' : '//button[contains(text(),"Далее")]', 'xpath_login_with_password' : '//button[text()="Вход по паролю"]',
           'Текст_нет_активных_лотов':'//div[contains(text(), "У вас нет активных лотов в продаже.")]',
@@ -605,7 +634,7 @@ if __name__ == '__main__':
 
     Список_ЛС = {}
     _today = str(datetime.datetime.today())[:10]
-    phone_lk_default = list(var["Телефоны"].keys())[0] # Первый телефон - логин авторизации
+    phone_lk_default = '' # list(var["Телефоны"].keys())[0] Первый телефон - логин авторизации
 
     for Current_phone in var["Телефоны"].keys():
         ПродаватьС = ПолучитьЗначениеКлючаРеестра(Current_phone+'ПродаватьС', "", str)
@@ -629,14 +658,13 @@ if __name__ == '__main__':
         if var["Телефоны"][Current_phone]['ЧасКонцаТорговли'] == '':
             var["Телефоны"][Current_phone]['ЧасКонцаТорговли'] = '24'
         var["Телефоны"][Current_phone]['brauzer'] = None
-        phone_lk = var["Телефоны"][Current_phone]['Телефон ЛК'] = var["Телефоны"][Current_phone].get('Телефон ЛК', phone_lk_default)
-        if phone_lk != phone_lk_default:
-            phone_lk_default = phone_lk # если не задан 'Телефон ЛК' то возьмется последний 'Телефон ЛК'
+        phone_lk = var["Телефоны"][Current_phone]['Телефон_ЛК'] = var["Телефоны"][Current_phone]['Телефон_ЛК']
+        if phone_lk != phone_lk_default or phone_lk_default == '':
+            phone_lk_default = phone_lk # если не задан 'Телефон_ЛК' то возьмется последний 'Телефон_ЛК'
         var["Телефоны"][Current_phone]['Profile_FireFox'] = name_Profile_FireFox = phone_lk + '.' + 'Profile_FireFox' # имя профиля FireFox
         var[name_Profile_FireFox] = None # очищаем ссылку на selenium
         if var["Телефоны"][Current_phone].get("Баланс", None) == None:
             var["Телефоны"][Current_phone]["Баланс"]=0
-
 
     while True:
         ВсегоНомеровСПродажей = var["Всего_на_продажу_Гб"] = var["Всего_на_продажу_минуты"] = 0
@@ -679,9 +707,9 @@ if __name__ == '__main__':
                 continue
 
             if xpath_last_element_html in [xpath['Войти'], xpath['xpath_phone']]:                 #  авторизация
-                log(f'Телефон для авторизации {var["Телефоны"][Current_phone]["Телефон ЛК"]}')
+                log(f'Телефон для авторизации {var["Телефоны"][Current_phone]["Телефон_ЛК"]}')
                 if (isXpath(xpath['xpath_phone']) or Press_Button('Войти', 1)) \
-                        and Past_Value('xpath_phone', var["Телефоны"][Current_phone]["Телефон ЛК"], 0.5) \
+                        and Past_Value('xpath_phone', var["Телефоны"][Current_phone]["Телефон_ЛК"], 0.5) \
                         and Press_Button('xpath_next_login', 5):
                     #         and Press_Button('//button[text()="Вход по паролю"]', 1) \
                     #         and Past_Value('//input[@id="keycloakAuth.password"]', password, 0.5):
@@ -775,11 +803,13 @@ if __name__ == '__main__':
             ВсегоНомеровСПродажей +=1
 
             ВыставитьЛоты('Гб')
+            # dict_phones_to_csv()
             ВыставитьЛоты('минуты')
             time.sleep(2)
 
         log('Итоги:')
         pprint.pprint(var["Телефоны"])
+        dict_phones_to_csv()
 
         log(f'Всего выставлено на продажу {var["Всего_на_продажу_минуты"]*var["Стоимость_1_ед_минуты"] + var["Всего_на_продажу_Гб"]*var["Стоимость_1_ед_Гб"]} руб. {var["Всего_на_продажу_минуты"]} минут {var["Всего_на_продажу_Гб"]} Гб')
 
