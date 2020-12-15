@@ -9,6 +9,8 @@ from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.common.by import By
 # from selenium.webdriver.common.action_chains import ActionChains
 import os, time, winreg, re, random, math, datetime, calendar, logging, pprint, winsound, keyboard, pandas as pd, traceback
+
+
 # pip3 install selenium keyboard pandas
 
 global brauzer, var, Current_phone, last_element_html
