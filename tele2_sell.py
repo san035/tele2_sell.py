@@ -11,8 +11,6 @@ from selenium.webdriver.common.by import By
 import os, time, winreg, re, random, math, datetime, calendar, logging, pprint, winsound, keyboard, pandas as pd, traceback
 
 
-# pip3 install selenium keyboard pandas
-
 global brauzer, var, Current_phone, last_element_html
 
 def sleep_or_press_keyboard(seconds=10, wait_press_keyboard=None) -> bool:
@@ -74,7 +72,7 @@ def log(text): # no_new_line - без новой строки  , Отправи�
         a=1
     return ''
 
-def wait_elements_xpath(xpath_elements, count_try_wait_max=60, find1=True, УдалятьСпецСимволыИзТекста=True, УспехТолькоСЗаполненнымиДанными=False):
+def wait_elements_xpath(xpath_elements, count_try_wait_max=60, find1=True, del_spec_char_from_text=True, true_if_exist_data=False):
     global last_element_html, xpath_last_element_html, xpath_last_element_text
     elements = {}
     for el in xpath_elements.split(';'):
@@ -96,11 +94,11 @@ def wait_elements_xpath(xpath_elements, count_try_wait_max=60, find1=True, Уд�
                 try:
                     elements[key_element]=brauzer.find_element_by_xpath(key_element)
                     xpath_last_element_text = elements[key_element].text
-                    if УдалятьСпецСимволыИзТекста:
+                    if del_spec_char_from_text:
                         xpath_last_element_text = re.sub(r'[^\x00-\x7f]', '', xpath_last_element_text)
                     if count_try_wait == count_try_wait_max:
                         log(' - найден, .text=' + xpath_last_element_text)
-                    if xpath_last_element_text == ''  and УспехТолькоСЗаполненнымиДанными:
+                    if xpath_last_element_text == ''  and true_if_exist_data:
                         log('Найденный тэг пустой, он считается как не найденный. Пауза 3 сек.')
                         elements[key_element] = False
                         time.sleep(3)
@@ -124,7 +122,7 @@ def wait_elements_xpath(xpath_elements, count_try_wait_max=60, find1=True, Уд�
 
 def Not_exist_Xpath(seek_xpath, wait_sec=10): # ожидает исчезновение seek_xpath
     if seek_xpath[0:2]!='//' and seek_xpath[0:1]!='(':
-        seek_xpath = xpath[seek_xpath]
+        seek_xpath = XPATH[seek_xpath]
 
     while wait_sec > 0:
         wait_sec -= 1
@@ -135,78 +133,76 @@ def Not_exist_Xpath(seek_xpath, wait_sec=10): # ожидает исчезнов�
         time.sleep(1)
     return False
 
-
-def isXpath(xpath): # проверяет наличие xpath на странице
+def isXpath(xpath_): # проверяет наличие xpath_ на странице
     global last_element_html, xpath_last_element_html, xpath_last_element_text
     try:
-        last_element_html = brauzer.find_element_by_xpath(xpath)
-        xpath_last_element_html=xpath
+        last_element_html = brauzer.find_element_by_xpath(xpath_)
+        xpath_last_element_html=xpath_
         xpath_last_element_text = last_element_html.text
         return last_element_html
     except:
         last_element_html = None
         return False
 
-def get_url(url):
+def get_url(url_open):
     global brauzer
     count_try_wait, max_count_try_wait = 1, 3
     while count_try_wait <= max_count_try_wait:
         try:
-            brauzer.get(url) # иногда ошибка
+            brauzer.get(url_open) # иногда ошибка
             if count_try_wait > 1:
-                log('Успешное открытие %s попытка %d' % (url, count_try_wait))
+                log('Успешное открытие %s попытка %d' % (url_open, count_try_wait))
             return True
         except:
-            log(f'Ошибка открытия {url} попытка {count_try_wait} из {max_count_try_wait}')
+            log(f'Ошибка открытия {url_open} попытка {count_try_wait} из {max_count_try_wait}')
             time.sleep(2)
             count_try_wait+=1
     return False
 
-def ЗакрытьВсеНенужноеПО():
-    for key in {'geckodriver.exe','firefox.exe'}:
-        cmd = "nircmd.exe execmd TASKKILL /F /IM "+key
-        os.system(cmd)
+def Close_ather_programm()->None:
+    os.system('chcp 65001>nul') # переключение кодировки консоли
+    for process_for_kill in {'geckodriver.exe','firefox.exe'}:
+        os.system(f"TASKKILL /F /IM {process_for_kill}")
     time.sleep(2)
 
-def init_Ветка_Реестра(name_Ветки=os.path.basename(__file__)): # запустить один раз перед использованием init_Ветка_Реестра('SkorPay')
-    global Ветка_Реестра_всех_настроек
-    # if not ('Ветка_Реестра_всех_настроек' in globals()):
+def init_branch_reestr(name_branch=os.path.basename(__file__)): # запустить один раз перед использованием init_branch_reestr('SkorPay')
+    global branch_reestr_config
+    # if not ('branch_reestr_config' in globals()):
     try:
-        Ветка_Реестра_всех_настроек = winreg.OpenKey(winreg.HKEY_CURRENT_USER, name_Ветки, winreg.KEY_READ | winreg.KEY_WRITE)
+        branch_reestr_config = winreg.OpenKey(winreg.HKEY_CURRENT_USER, name_branch, winreg.KEY_READ | winreg.KEY_WRITE)
     except:
-        Ветка_Реестра_всех_настроек = winreg.CreateKey(winreg.HKEY_CURRENT_USER, name_Ветки)
+        branch_reestr_config = winreg.CreateKey(winreg.HKEY_CURRENT_USER, name_branch)
 
 
-def ПолучитьЗначениеКлючаРеестра(КлючРеестра, ЗначениеПоУмолчанию=False, тип=0):
-    global Ветка_Реестра_всех_настроек
+def get_value_by_key_reestr(key_reestr, value_default=False, type_value=0):
+    global branch_reestr_config
     try:
-        зн = winreg.QueryValueEx(Ветка_Реестра_всех_настроек, КлючРеестра)[0]
-        if тип == float:
-            return float(зн)
-        elif isinstance(ЗначениеПоУмолчанию, list):
-            return eval(зн)
-        elif type(ЗначениеПоУмолчанию) is dict:
-            # return eval('{' + зн + '}')
-            return eval(зн)
-        elif тип == str:
-            return str(зн)
-        return зн # тип int и др.
+        value_key = winreg.QueryValueEx(branch_reestr_config, key_reestr)[0]
+        if type_value == float:
+            return float(value_key)
+        elif isinstance(value_default, list):
+            return eval(value_key)
+        elif type(value_default) is dict:
+            # return eval('{' + value_key + '}')
+            return eval(value_key)
+        elif type_value == str:
+            return str(value_key)
+        return value_key # тип int и др.
     except:
-        return ЗначениеПоУмолчанию
+        return value_default
 
-def СохранитьЗначениеКлючаРеестра(КлючРеестра, Значение, тип_в_реестре=winreg.REG_SZ):
+def save_value_to_reestr(key_reestr, value_to_save, type_value_in_reestr=winreg.REG_SZ):
     # winreg.REG_DWORD    # 32-bit number.
     # winreg.REG_QWORD    # A 64-bit number.
-    global Ветка_Реестра_всех_настроек
-    if isinstance(Значение, list) and тип_в_реестре==winreg.REG_SZ:
-        Значение = ДвумерныйСписокВСтроку(Значение) # преобразуем в строку
-    elif type(Значение) is dict:
-        Значение = str(Значение)
-    winreg.SetValueEx(Ветка_Реестра_всех_настроек, КлючРеестра, 0, тип_в_реестре, Значение)
+    global branch_reestr_config
+    if isinstance(value_to_save, list) and type_value_in_reestr==winreg.REG_SZ:
+        value_to_save = ДвумерныйСписокВСтроку(value_to_save) # преобразуем в строку
+    elif type(value_to_save) is dict:
+        value_to_save = str(value_to_save)
+    winreg.SetValueEx(branch_reestr_config, key_reestr, 0, type_value_in_reestr, value_to_save)
 
-def Перезапуск_Браузера(profile=False):
+def restart_browser(profile=False):
     global brauzer
-    ЗакрытьВсеНенужноеПО()
     brauzer = None
 
     FirefoxProfile = webdriver.FirefoxProfile()
@@ -254,8 +250,8 @@ def open_url(new_url, wait_element, max_count_try=4, update=False, error_xpath=F
         str_log = 'Открытие %s попытка %s из %d' %(new_url, count_try_wait, max_count_try)
         if update or brauzer.current_url[0:len(new_url)] != new_url or count_try_wait > 1: # иногда ошибка
             get_url(new_url)
-        сек_ожидания = min(count_try_wait * 5, 10)
-        sleep_or_press_keyboard(сек_ожидания)
+        seconds_wait = min(count_try_wait * 5, 10)
+        sleep_or_press_keyboard(seconds_wait)
 
         if wait_elements_xpath(wait_element):
             return True
@@ -264,20 +260,13 @@ def open_url(new_url, wait_element, max_count_try=4, update=False, error_xpath=F
         #         if count_try_wait > 1:
         #             log(str_log + ' %s - успешно!' %element)
         #         if error_xpath and isXpath(error_xpath):
-        #             log(f'Найден {error_xpath} будет обновление страницы через {сек_ожидания} сек.')
-        #             time.sleep(сек_ожидания)
+        #             log(f'Найден {error_xpath} будет обновление страницы через {seconds_wait} сек.')
+        #             time.sleep(seconds_wait)
         #             continue
         #         return True
         #     if count_try_wait > 1:
         #         log(str_log + ' %s - Не успешно!' % element)
 
-        # url=brauzer.current_url
-        # if url[0:len(new_url)]==new_url:
-        #     log(f'Ожидание элемента {wait_element}, пауза {сек_ожидания} сек.')
-        #     time.sleep(сек_ожидания)
-        #     continue
-
-        # if count_try_wait>1:
         log(f'Ошибка открытия url={new_url} попытка {count_try_wait} из {max_count_try}')
 
     return False
@@ -302,11 +291,11 @@ def click(xpath_el=None, count_try_wait_max=10):
     return False
 
 
-def Press_Button(xpath_Button, sleep_after=0.3, wait_sec=2, Попыток=2):
-    global brauzer, url, xpath, last_element_html
+def Press_Button(xpath_Button, sleep_after=0.3, wait_sec=2, try_max=3):
+    global brauzer, url, XPATH, last_element_html
     if xpath_Button != '':
         if xpath_Button[0:2]!='//' and xpath_Button[0:1]!='(':
-            xpath_Button = xpath[xpath_Button]
+            xpath_Button = XPATH[xpath_Button]
 
         while wait_sec > 0:
             wait_sec -= 1
@@ -314,7 +303,7 @@ def Press_Button(xpath_Button, sleep_after=0.3, wait_sec=2, Попыток=2):
                 time.sleep(0.1)
                 break
             time.sleep(1)
-    for number_try in range(Попыток):
+    for number_try in range(try_max):
         try:
             if number_try>0:
                 last_element_html = WebDriverWait(brauzer, 8).until(expected_conditions.element_to_be_clickable((By.XPATH, xpath_last_element_html)))
@@ -325,13 +314,13 @@ def Press_Button(xpath_Button, sleep_after=0.3, wait_sec=2, Попыток=2):
             #  WebDriverWait(brauzer, 8).until(last_element_html.invisibility_of_element_located((By.XPATH, xpath_last_element_html))) and then el_xp("//input[@value='Save']").click()
 
             if number_try > 0:
-                log (f' {number_try+1}/{Попыток} успех')
+                log (f' {number_try+1}/{try_max} успех')
 
             if sleep_after:
                 time.sleep(sleep_after)
             return True
         except Exception as err:
-            log(f' {number_try+1}/{Попыток} Ошибка click {xpath_Button} {err}')
+            log(f' {number_try+1}/{try_max} Ошибка click {xpath_Button} {err}')
             time.sleep(5)
     return False
 
@@ -341,7 +330,7 @@ def sleep(sec):
 
 def Past_Value(xpath_Value, val, sleep=0.3):
     if xpath_Value[0:2]!='//':
-        xpath_Value = xpath[xpath_Value]
+        xpath_Value = XPATH[xpath_Value]
     for i in range(3):
         try:
             last_element_html = brauzer.find_element_by_xpath(xpath_Value)
@@ -362,79 +351,82 @@ def Past_Value(xpath_Value, val, sleep=0.3):
         time.sleep(1)
     return False
 
-def Удаление_всех_лотов(МаксКолУдаляемыхЛотовПоРесурсу=2):
-    global brauzer, url, xpath, Current_phone
-    log (f'Удаление всех лотов до {МаксКолУдаляемыхЛотовПоРесурсу} шт. по {Current_phone}.')
-    if not open_url(url['url_Мои_лоты'], xpath['Сформировать_лот_Начало']):
+def del_all_lots(max_lots_for_del_by_resource=2):
+    global brauzer, url, XPATH, Current_phone
+    log (f'Удаление всех лотов до {max_lots_for_del_by_resource} шт. по {Current_phone}.')
+    if not open_url(url['url_Мои_лоты'], XPATH['Сформировать_лот_Начало']):
         log (f'Не удалось удалить лоты {Current_phone}')
         sleep(60)
         return False
 
-    есть_удаленные_лоты = False
-    МаксКолУдаляемыхЛотовПоРесурсу = МаксКолУдаляемыхЛотовПоРесурсу//2
+    exist_dleted_lots = False
+    max_lots_for_del_by_resource = max_lots_for_del_by_resource//2
     for Resource_for_sale in ('Гб', 'минуты'):
-        НомерУдаляемогоЛота = 1
-        while НомерУдаляемогоЛота <= МаксКолУдаляемыхЛотовПоРесурсу and not isXpath(xpath['Текст_нет_активных_лотов']):
-            НомерУдаляемогоЛота +=1
+        number_lot_for_del = 1
+        while number_lot_for_del <= max_lots_for_del_by_resource and not isXpath(XPATH['Текст_нет_активных_лотов']):
+            number_lot_for_del +=1
             # посменно удаляются лоты интеренет и минут
-            if not isXpath(xpath['Удаление_лота_количество_' + Resource_for_sale]):
+            if not isXpath(XPATH['Удаление_лота_количество_' + Resource_for_sale]):
                 break
-            УдаляемоеКол = Число(xpath_last_element_text)
-            if УдаляемоеКол > 0 and sleep(0.5) and Press_Button(xpath['Удаление_лота_начало_' + Resource_for_sale], 1, 9) and Press_Button('Редактирования_лота_Отозвать', 1) \
+            count_for_del = str_to_int(xpath_last_element_text)
+            if count_for_del > 0 and sleep(0.5) and Press_Button(XPATH['Удаление_лота_начало_' + Resource_for_sale], 1, 9) and Press_Button('Редактирования_лота_Отозвать', 1) \
                     and Press_Button('Редактирования_лота_Отозвать_Подтверждение') and Not_exist_Xpath('Кнопка_закрытия_окна'):
-                # and isXpath(xpath['Редактирования_лота_Отозвать_Подтверждение']) and sleep(0.5)
+                # and isXpath(XPATH['Редактирования_лота_Отозвать_Подтверждение']) and sleep(0.5)
 
-                var["Телефоны"][Current_phone][f'Остатки_{Resource_for_sale}'] += УдаляемоеКол
-                log(f'Конец удаления {НомерУдаляемогоЛота} лота {УдаляемоеКол} {Resource_for_sale} новый остаток {var["Телефоны"][Current_phone][f"Остатки_{Resource_for_sale}"]}')
-                есть_удаленные_лоты = True
+                var["Телефоны"][Current_phone][f'Остатки_{Resource_for_sale}'] += count_for_del
+                log(f'Конец удаления {number_lot_for_del} лота {count_for_del} {Resource_for_sale} новый остаток {var["Телефоны"][Current_phone][f"Остатки_{Resource_for_sale}"]}')
+                exist_dleted_lots = True
             else:
-                log(f'Ошибка удаления лота {УдаляемоеКол} {Resource_for_sale}, будут обновлены остатки.')
+                log(f'Ошибка удаления лота {count_for_del} {Resource_for_sale}, будут обновлены остатки.')
                 var["Телефоны"][Current_phone]['ОбновитьОстатки']=True
-                if not open_url(url['url_Мои_лоты'], xpath['Сформировать_лот_Начало']):
+                if not open_url(url['url_Мои_лоты'], XPATH['Сформировать_лот_Начало']):
                     sleep(3)
                     return False
                 break
 
-        if xpath_last_element_html == xpath['Текст_нет_активных_лотов']:
+        if xpath_last_element_html == XPATH['Текст_нет_активных_лотов']:
             log (f'Нет_активных_лотов {Current_phone}')
-            СохранитьЗначениеКлючаРеестра(Current_phone+'_Выставленное_количествo_Гб', 0, winreg.REG_DWORD)
-            СохранитьЗначениеКлючаРеестра(Current_phone+'_Выставленное_количествo_минуты', 0, winreg.REG_DWORD)
+            save_value_to_reestr(Current_phone+'_Выставленное_количествo_Гб', 0, winreg.REG_DWORD)
+            save_value_to_reestr(Current_phone+'_Выставленное_количествo_минуты', 0, winreg.REG_DWORD)
             var["Телефоны"][Current_phone]['Выставлно_Гб']=var["Телефоны"][Current_phone]['Выставлно_минуты']=0
             break
 
-    return есть_удаленные_лоты
+    return exist_dleted_lots
 
-def Число(str): #строка в число
+def str_to_int(str)->int: #строка в число
     match = re.search(r'\d+', str)
     return int(match[0]) if match else 0
-
 
 def Получить_доступные_остатки(): # чтение остатков Гб и Минут
     global var, Current_phone, xpath_last_element_text
 
-    if not open_url(url['url_lk'], xpath['Остатки_lk_минуты']+';'+xpath['Остатки_lk_Гб']+';//h2[text()="Доступно"]'):
+    if not open_url(url['url_lk'], XPATH['Остатки_lk_минуты']+';'+XPATH['Остатки_lk_Гб']+';//h2[text()="Доступно"]'):
         return False
 
     time.sleep(1)
 
-    ОстакиПрочитаны = False
+    is_read_resource = False
     for Resource_for_sale in ['минуты', 'Гб']:
         key_остатки = f'Остатки_{Resource_for_sale}'
-        if isXpath(xpath[f'Остатки_lk_{Resource_for_sale}']):
-            var["Телефоны"][Current_phone][key_остатки]= Число(xpath_last_element_text.replace(' ', ''))
-            ОстакиПрочитаны = True
+        if isXpath(XPATH[f'Остатки_lk_{Resource_for_sale}']):
+            var["Телефоны"][Current_phone][key_остатки]= str_to_int(xpath_last_element_text.replace(' ', ''))
+            is_read_resource = True
         else:
             if Resource_for_sale == 'Гб' and isXpath('//a[contains(text(),"Подключить пакет интернета")]'):
-                ОстакиПрочитаны = True
+                is_read_resource = True
             var["Телефоны"][Current_phone].update({key_остатки:0})
 
-    if ОстакиПрочитаны:
+    if is_read_resource:
         var["Телефоны"][Current_phone]['ОбновитьОстатки']=False
 
     log(f'Остатки {Current_phone} {var["Телефоны"][Current_phone]["Остатки_Гб"]} Гб {var["Телефоны"][Current_phone]["Остатки_минуты"]} Мин. Не продавать {var["Телефоны"][Current_phone]["Оставлять_Гб"]} Гб {var["Телефоны"][Current_phone]["Оставлять_минуты"]} Мин.' )
-    return ОстакиПрочитаны
+    return is_read_resource
 
-def ВыставитьЛоты(Resource_for_sale):
+def ВыставитьЛоты(Resource_for_sale)->None:
+    """
+    Выставление лотов на продажу по ресурсу Resource_for_sale
+    перед открытием уже должна быть открыта страница https://yar.tele2.ru/stock-exchange/my
+    """
 
     global Current_phone, brauzer, var, _today
     ОставлятьРесурса = var["Телефоны"][Current_phone].get('Оставлять_'+Resource_for_sale, -1)
@@ -450,11 +442,11 @@ def ВыставитьЛоты(Resource_for_sale):
         log (f'Пакет для продажи {Resource_for_sale} {Остатки_Ресурса} меньше минимального лота {var["Min_count_for_sale_"+Resource_for_sale]}')
         return False
 
-    if brauzer.current_url != url['url_Мои_лоты'] and not open_url(url['url_'+Resource_for_sale], xpath['Сформировать_лот_Начало'], 2):
+    if brauzer.current_url != url['url_Мои_лоты'] and not open_url(url['url_'+Resource_for_sale], XPATH['Сформировать_лот_Начало'], 2):
         sleep_or_press_keyboard(600) # time.sleep(600)
         return False
 
-    var["Телефоны"][Current_phone]['Выставлно_'+Resource_for_sale]=ПолучитьЗначениеКлючаРеестра(Current_phone+'_Выставленное_количествo_'+Resource_for_sale, 0, int)
+    var["Телефоны"][Current_phone]['Выставлно_'+Resource_for_sale]=get_value_by_key_reestr(Current_phone+'_Выставленное_количествo_'+Resource_for_sale, 0, int)
     Подписаться = var["Телефоны"][Current_phone]['Подписаться']
     while  1:
         макс_количествo = Остатки_Ресурса-var["Телефоны"][Current_phone]['Выставлно_'+Resource_for_sale]
@@ -467,13 +459,13 @@ def ВыставитьЛоты(Resource_for_sale):
 
         if Press_Button('Сформировать_лот_Начало', 1) \
                 and (brauzer.current_url == url['url_'+Resource_for_sale] or (Press_Button('Выбор_типа_лота_'+Resource_for_sale) and Press_Button('Кнопка_Продолжить'))) \
-                and Press_Button('Подготовка_к_вводу_количества', 1, 2) \
+                and Press_Button('Подготовка_к_вводу_количества', 1, 3) \
                 and Past_Value('Сформировать_лот_Поле_количествo_'+Resource_for_sale, str(количество_для_продажи)) \
                 and Press_Button('Подготовка_к_вводу_Суммы') \
                 and Past_Value('Сформировать_лот_Поле_Сумма', сумма_продажи)  \
                 and Press_Button('Кнопка_Продолжить', 3) \
-                and Press_Button('Кнопка_Продолжить', 3) \
-                and ((not Подписаться) or Press_Button('Подписаться_как')):
+                and ((not Подписаться) or Press_Button('Подписаться_как', sleep_after=0.1))\
+                and Press_Button('Кнопка_Продолжить', sleep_after=1):
             # and Press_Button('Сформировать_лот_Smile2') and Press_Button('Сформировать_лот_Smile2')
             # and Press_Button('Сформировать_лот_Smile2', 0.5, 60)
 
@@ -481,17 +473,18 @@ def ВыставитьЛоты(Resource_for_sale):
             var["Телефоны"][Current_phone]['Выставлно_'+Resource_for_sale] += количество_для_продажи
             var["Всего_на_продажу_"+Resource_for_sale] += количество_для_продажи
 
-            СохранитьЗначениеКлючаРеестра(Current_phone+'_Выставленное_количествo_'+Resource_for_sale, var["Телефоны"][Current_phone]['Выставлно_'+Resource_for_sale], winreg.REG_DWORD)
+            save_value_to_reestr(Current_phone+'_Выставленное_количествo_'+Resource_for_sale, var["Телефоны"][Current_phone]['Выставлно_'+Resource_for_sale], winreg.REG_DWORD)
             var["Телефоны"][Current_phone][f'Остатки_{Resource_for_sale}'] -= количество_для_продажи
 
             # сохранение кол-ва выставленных лотов в день
-            КлючРеестра = _today+'_Выставлено_лотов'
-            СохранитьЗначениеКлючаРеестра(КлючРеестра, ПолучитьЗначениеКлючаРеестра(КлючРеестра, 0, int) + 1, winreg.REG_DWORD)
-            КлючРеестра = Current_phone + КлючРеестра
-            СохранитьЗначениеКлючаРеестра(КлючРеестра, ПолучитьЗначениеКлючаРеестра(КлючРеестра, 0, int) + 1, winreg.REG_DWORD)
+            key_reestr = _today+'_Выставлено_лотов'
+            save_value_to_reestr(key_reestr, get_value_by_key_reestr(key_reestr, 0, int) + 1, winreg.REG_DWORD)
+            key_reestr = Current_phone + key_reestr
+            save_value_to_reestr(key_reestr, get_value_by_key_reestr(key_reestr, 0, int) + 1, winreg.REG_DWORD)
         else:
-            log ('Ошибка выставления лота')
+            log (f'Ошибка выставления лота {Resource_for_sale}')
             var["Телефоны"][Current_phone]['ОбновитьОстатки']=True
+            open_url(url['url_Мои_лоты'], XPATH['Сформировать_лот_Начало']) # переоткрываем страницу, чтобы скрыть открытые окна
             break
 
 def Подарить_ресурс_Гб():
@@ -546,7 +539,6 @@ def dict_phones_to_csv(name_csv_phones_cfg = 'phones_cfg.csv'):  # конвер�
     df = pd.DataFrame(data_phones, columns=columns)
     df.to_csv(name_csv_phones_cfg, index=False) # , sep=','
 
-
 def Close_brauzers(dict_Profile_FireFox):
     log(f'Закрытие всех браузеров.')
     for Profile_FireFox, brauzer in dict_Profile_FireFox.items():
@@ -571,12 +563,11 @@ var ={'Min_count_for_sale_Гб':5, 'Min_count_for_sale_минуты':50, 'Мак
       }
 
 
-init_Ветка_Реестра() # загрузка настроек
+init_branch_reestr() # загрузка настроек
 
 def load_cfg(name_csv_phones_cfg = 'phones_cfg.csv'):
       # имя файла с настройками по телефонам
     def to_str(var):
-        # print(var)
         return var
 
     def to_bool(var):
@@ -603,14 +594,16 @@ def load_cfg(name_csv_phones_cfg = 'phones_cfg.csv'):
         log(f'Ошибка загрузки файла {name_csv_phones_cfg} Ошибка: {traceback.format_exc()}')
         exit(0)
     df.set_index('Телефон', inplace=True)  # переназначение индекса
+    df = df.sort_values(by=['Приоритет', 'Name']) #.reset_index(drop = True)
 
     var["Телефоны"] = df.to_dict('index')
 
 if __name__ == '__main__':
+    Close_ather_programm()
 
     load_cfg() # загрузка настроек
 
-    xpath={'xpath_phone':'//input[@id="keycloakAuth.phone"]', 'xpath_next_login' : '//button[contains(text(),"Далее")]', 'xpath_login_with_password' : '//button[text()="Вход по паролю"]',
+    XPATH={'xpath_phone':'//input[@id="keycloakAuth.phone"]', 'xpath_next_login' : '//button[contains(text(),"Далее")]', 'xpath_login_with_password' : '//button[text()="Вход по паролю"]',
           'Текст_нет_активных_лотов':'//div[contains(text(), "У вас нет активных лотов в продаже.")]',
            'Сформировать_лот_Начало':'//span/a[contains(text(), "Сформировать лот")]',
            'Подготовка_к_вводу_количества':'(//div[@class="lot-setup__manual-input"])[1]', 'Подготовка_к_вводу_Суммы':'//div[@class="lot-setup__manual-input"][last()]',
@@ -650,7 +643,7 @@ if __name__ == '__main__':
     phone_lk_default = '' # list(var["Телефоны"].keys())[0] Первый телефон - логин авторизации
 
     for Current_phone in var["Телефоны"].keys():
-        ПродаватьС = ПолучитьЗначениеКлючаРеестра(Current_phone+'ПродаватьС', "", str)
+        ПродаватьС = get_value_by_key_reestr(Current_phone+'ПродаватьС', "", str)
         if ПродаватьС <= _today:
             ПродаватьС = ''
         var["Телефоны"][Current_phone]['ПродаватьС'] = ПродаватьС
@@ -667,7 +660,7 @@ if __name__ == '__main__':
             var["Телефоны"][ЛС]['ПочиненныеНомера'].append(Current_phone)
         Список_ЛС.update({ЛС:var["Телефоны"][ЛС]['ПочиненныеНомера']})
 
-        var["Телефоны"][Current_phone]['ОбновитьОстатки'] = ПолучитьЗначениеКлючаРеестра(Current_phone + 'ОбновитьОстаткиС', "") <= _today
+        var["Телефоны"][Current_phone]['ОбновитьОстатки'] = get_value_by_key_reestr(Current_phone + 'ОбновитьОстаткиС', "") <= _today
         if var["Телефоны"][Current_phone]['ЧасКонцаТорговли'] == '':
             var["Телефоны"][Current_phone]['ЧасКонцаТорговли'] = '24'
         var["Телефоны"][Current_phone]['brauzer'] = None
@@ -680,12 +673,12 @@ if __name__ == '__main__':
             var["Телефоны"][Current_phone]["Баланс"]=0
 
     while True:
-        ВсегоНомеровСПродажей = var["Всего_на_продажу_Гб"] = var["Всего_на_продажу_минуты"] = 0
+        count_phone_for_sale = var["Всего_на_продажу_Гб"] = var["Всего_на_продажу_минуты"] = 0
 
         _today = str(datetime.datetime.today())[:19]
-        ЧасТорговли = _today[11:13]
+        hour_trade = _today[11:13]
         _today = _today[:10]
-        До_начала = ВремяДоНачалаТоргов(int(ЧасТорговли), var['ЧасНачалаТорговли'], var['ЧасКонцаТорговли'])
+        До_начала = ВремяДоНачалаТоргов(int(hour_trade), var['ЧасНачалаТорговли'], var['ЧасКонцаТорговли'])
         if До_начала >  0:
              print(f"До начала торгов {round(До_начала, 2)} часов. Начало {var['ЧасНачалаТорговли']} конец {var['ЧасКонцаТорговли']} часов.")
              if brauzer != None:
@@ -701,7 +694,7 @@ if __name__ == '__main__':
             Profile_FireFox = var["Телефоны"][Current_phone]['Profile_FireFox']
             brauzer = dict_Profile_FireFox.get(Profile_FireFox, None)
             if brauzer == None:
-                dict_Profile_FireFox[Profile_FireFox] = Перезапуск_Браузера(Profile_FireFox)
+                dict_Profile_FireFox[Profile_FireFox] = restart_browser(Profile_FireFox)
                 if brauzer == None:
                     log(f'Для {Current_phone} не удалось открыть браузер с профилем {Profile_FireFox}')
                     sleep_or_press_keyboard(300, wait_press_keyboard = {'esc':'для досрочного продолжения'})
@@ -710,19 +703,19 @@ if __name__ == '__main__':
             phone_enable, sell_with=var["Телефоны"][Current_phone]['Активная_симка'] , var["Телефоны"][Current_phone].get('ПродаватьС', '')
             log(f'Начало переключения на номер {Current_phone} {var["Телефоны"][Current_phone]["Name"]} {var["Телефоны"][Current_phone]["Баланс"]}р Активность:{phone_enable} использовать с: {sell_with} ОбновитьОстатки={var["Телефоны"][Current_phone]["ОбновитьОстатки"]}')
             phone_enable = (phone_enable and (_today >= sell_with))\
-                         and var["Телефоны"][Current_phone]['ЧасНачалаТорговли'] <= ЧасТорговли <= var["Телефоны"][Current_phone]['ЧасКонцаТорговли']
+                         and var["Телефоны"][Current_phone]['ЧасНачалаТорговли'] <= hour_trade <= var["Телефоны"][Current_phone]['ЧасКонцаТорговли']
             ЕстьКомуДаритьГб = len(var["Кому_дарить_Гб"])>0 and Current_phone in var["Откуда_дарить_Гб"] and var["Телефоны"][Current_phone].get("Остатки_Гб", -1) != 0
             if  not phone_enable and not var["Телефоны"][Current_phone]['ОбновитьОстатки'] and not ЕстьКомуДаритьГб:
                 continue
 
-            if not open_url(url['url_lk'], xpath['Войти']+';' + xpath['xpath_phone'] + ';' + xpath['Мой_Tele2'], 2):
+            if not open_url(url['url_lk'], XPATH['Войти']+';' + XPATH['xpath_phone'] + ';' + XPATH['Мой_Tele2'], 2):
                 sleep_or_press_keyboard(600, {'c':' -  скопировать с про'})
 
                 continue
 
-            if xpath_last_element_html in [xpath['Войти'], xpath['xpath_phone']]:                 #  авторизация
+            if xpath_last_element_html in [XPATH['Войти'], XPATH['xpath_phone']]:                 #  авторизация
                 log(f'Телефон для авторизации {var["Телефоны"][Current_phone]["Телефон_ЛК"]}')
-                if (isXpath(xpath['xpath_phone']) or Press_Button('Войти', 1)) \
+                if (isXpath(XPATH['xpath_phone']) or Press_Button('Войти', 1)) \
                         and Past_Value('xpath_phone', var["Телефоны"][Current_phone]["Телефон_ЛК"], 0.5) \
                         and Press_Button('xpath_next_login', 5):
                     #         and Press_Button('//button[text()="Вход по паролю"]', 1) \
@@ -730,20 +723,20 @@ if __name__ == '__main__':
 
                     #         ожидание входа человеком
                     log ('Ожидание входа человеком')
-                    while not isXpath(xpath['Мой_Tele2']):
+                    while not isXpath(XPATH['Мой_Tele2']):
                         sleep_or_press_keyboard(20)
 
             phone_format = Current_phone[0:3]+' '+Current_phone[3:6]+' '+Current_phone[6:8]+' '+Current_phone[8:10]
             if isXpath(f'//button/h1[contains(text(),"{phone_format}")]'):
                 log(f'Номер {Current_phone} уже выбран из списка.') #  управляемых номеров
             elif open_url(url['url_lk'], '//span[contains(@class, "dashboard-number__icon")]', 2, error_xpath='//div[@class="data-unavailable-message lk-new error-message"]') and click() and sleep(0.8)\
-                and click(f'//li/button/h3[contains(text(),"{phone_format}")]/..', 10) and wait_elements_xpath(f'//button/h1[contains(text(),"{phone_format}")]', 30) and wait_elements_xpath(xpath['Баланс'], 30):
+                and click(f'//li/button/h3[contains(text(),"{phone_format}")]/..', 10) and wait_elements_xpath(f'//button/h1[contains(text(),"{phone_format}")]', 30) and wait_elements_xpath(XPATH['Баланс'], 30):
                 var["Телефоны"][Current_phone]['Баланс']=float(xpath_last_element_text.replace(' ', '').replace(',', '.')) #.replace('₽', '')
                 var["Телефоны"][Current_phone]['Баланс_дата'] = _today
                 log(f'Успешное переключение на номер {Current_phone} баланс {xpath_last_element_text} руб.')
 
                 # обновление Абонплата
-                if var["Телефоны"][Current_phone].get('Абонплата', 0) <= 0 and isXpath(xpath['Абонплата']):
+                if var["Телефоны"][Current_phone].get('Абонплата', 0) <= 0 and isXpath(XPATH['Абонплата']):
                     rez_match = re.search('(Абонентская плата )(.+)( ₽ будет списана )(\d+)', xpath_last_element_text)
                     if rez_match:
                         var["Телефоны"][Current_phone]['Абонплата'] = float(rez_match.group(2))
@@ -754,7 +747,7 @@ if __name__ == '__main__':
                 sleep_or_press_keyboard(180)
                 continue
 
-            if isXpath(xpath['Мой_Tele2_номер']):
+            if isXpath(XPATH['Мой_Tele2_номер']):
                 Current_phone2 = last_element_html.text.replace(' ', '')
                 if Current_phone2 != Current_phone:
                     log(f'Не корректное переключение на {Current_phone} на экране ЛК {Current_phone2}')
@@ -787,7 +780,7 @@ if __name__ == '__main__':
                 time.sleep(1)
                 continue
 
-            Удаление_всех_лотов(40)
+            del_all_lots(40)
 
 
 
@@ -808,13 +801,13 @@ if __name__ == '__main__':
                         ДатаОбновленияБаланса += datetime.timedelta(days=days_in_month)
 
                     var["Телефоны"][Current_phone]['ПродаватьС'] = sell_with = str(ДатаОбновленияБаланса)[:10] #int(time.mktime(ДатаОбновленияБаланса.timetuple()))
-                    СохранитьЗначениеКлючаРеестра(Current_phone+'ПродаватьС', sell_with) # , winreg.REG_DWORD
+                    save_value_to_reestr(Current_phone+'ПродаватьС', sell_with) # , winreg.REG_DWORD
                     log(f'Новая дата ПродаватьС для {Current_phone}: {sell_with}') #time.ctime(ПродаватьС) .strftime("%d.%m.%Y")
 
                 log(f'Нет ресурсов для продажи. Переход к следущему номеру.\n')
                 continue
 
-            ВсегоНомеровСПродажей +=1
+            count_phone_for_sale +=1
 
             ВыставитьЛоты('Гб')
             # dict_phones_to_csv()
@@ -840,7 +833,7 @@ if __name__ == '__main__':
                 text = f'!!!! Недостаточно {int(abs(ИзлишекБаланса))} для ' +  text
             log(text)
 
-        if ВсегоНомеровСПродажей==0 and sell_with > str(datetime.datetime.now())[:10]:
+        if count_phone_for_sale==0 and sell_with > str(datetime.datetime.now())[:10]:
             near_data='2999-01-01'
             for Current_phone in var["Телефоны"].keys():
                 sell_with = var["Телефоны"][Current_phone].get('ПродаватьС', '')
@@ -853,5 +846,5 @@ if __name__ == '__main__':
         else:
             СекДоЗапуска = var["Пауза_между_выставлений_лотов_сек"]
 
-        log(f'Пауза {СекДоЗапуска} сек. ВсегоНомеровСПродажей={ВсегоНомеровСПродажей}')
+        log(f'Пауза {СекДоЗапуска} сек. count_phone_for_sale={count_phone_for_sale}')
         sleep_or_press_keyboard(СекДоЗапуска)
