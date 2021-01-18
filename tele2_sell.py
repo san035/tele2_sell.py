@@ -1,14 +1,12 @@
 # coding: utf8
 from selenium import webdriver
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-# from selenium.webdriver.firefox.options import Options
-# from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.common.by import By
-# from selenium.webdriver.common.action_chains import ActionChains
-import os, time, winreg, re, random, math, datetime, calendar, logging, pprint, winsound, keyboard, pandas as pd, traceback
+import os, time, winreg, re, random, math, datetime, calendar, logging, pprint, winsound, keyboard, pandas as pd, sys
+import traceback
 
 
 global brauzer, var, Current_phone, last_element_html
@@ -56,10 +54,10 @@ def sleep_or_press_keyboard(seconds=10, wait_press_keyboard=None) -> bool:
     return False
 
 def log_start(file=__file__):
-    logging.basicConfig(filename= file + ".log", format=u'%(asctime)s;  %(message)s',
-                        level=logging.INFO)  # , level = logging.INFO DEBUG  LINE:%(lineno)d;
+    logging.basicConfig(filename= file + ".log", format=u'%(asctime)s;  %(message)s',level=logging.INFO)
     log("----------------------------------------------------------")
-    log("Program started")
+    log("Program started. Python version " + sys.version.split(' ')[0])
+
 
 def log(text): # no_new_line - без новой строки  , ОтправитьВТелеграмм = False
     new_line = ' '  #if no_new_line else '\n'
@@ -195,9 +193,10 @@ def save_value_to_reestr(key_reestr, value_to_save, type_value_in_reestr=winreg.
     # winreg.REG_DWORD    # 32-bit number.
     # winreg.REG_QWORD    # A 64-bit number.
     global branch_reestr_config
-    if isinstance(value_to_save, list) and type_value_in_reestr==winreg.REG_SZ:
-        value_to_save = ДвумерныйСписокВСтроку(value_to_save) # преобразуем в строку
-    elif type(value_to_save) is dict:
+    # if isinstance(value_to_save, list) and type_value_in_reestr==winreg.REG_SZ:
+    #     value_to_save = ДвумерныйСписокВСтроку(value_to_save) # преобразуем в строку
+    # el
+    if type(value_to_save) is dict:
         value_to_save = str(value_to_save)
     winreg.SetValueEx(branch_reestr_config, key_reestr, 0, type_value_in_reestr, value_to_save)
 
@@ -209,6 +208,8 @@ def restart_browser(profile=False):
     if profile:
         if profile == True:
             profile = __file__+'.Profiles_Firefox'
+        else:
+            profile = f'{os.getcwd()}\\{profile}'
         if os.path.exists(profile):
             log(f'Профиль Firefox={profile}')
             FirefoxProfile = webdriver.FirefoxProfile(profile)     #  profile - имя файла профиля из папки (%APPDATA%\Mozilla\Firefox\Profiles\) C://Users//SkorPay//AppData//Roaming//Mozilla//Firefox//Profiles//, например 'etc7988t.default-release'
@@ -237,8 +238,14 @@ def restart_browser(profile=False):
         FirefoxProfile.set_preference(key, Firefox_Config[key])
     # FirefoxProfile.setEnableNativeEvents(true);
 
-    brauzer = webdriver.Firefox(firefox_profile=FirefoxProfile, capabilities=cap)
-    return brauzer
+    for _try in range(2):
+        try:
+            brauzer = webdriver.Firefox(firefox_profile=FirefoxProfile, capabilities=cap)
+            return brauzer
+        except Exception: # selenium.common.exceptions.WebDriverException
+            log(f'Ошибка: {traceback.format_exc()}')
+            # Close_brauzers(dict_Profile_FireFox)
+    exit
 
 def open_url(new_url, wait_element, max_count_try=4, update=False, error_xpath=False): # открытие страницы оплаты
     global current_bank, brauzer
@@ -547,6 +554,49 @@ def Close_brauzers(dict_Profile_FireFox):
             log(f'Ошибка при закрытии браузера {Profile_FireFox}! {err}')
         dict_Profile_FireFox[Profile_FireFox] = None
 
+def to_str(var):
+    return var
+
+def to_bool(var):
+    if type(var) != bool:
+        return False
+    return var
+
+def to_int(var):
+    if type(var) != int:
+        return 0
+    return var
+
+def to_float(var):
+    if type(var) != float:
+        return 0
+    return var
+
+def load_cfg2():
+    pass
+
+def load_cfg(name_csv_phones_cfg='phones_cfg.csv')->None:
+    # имя файла с настройками по телефонам
+    # try:
+    print(f'Начало загрухки {name_csv_phones_cfg}')
+    # exit(0)
+    df = pd.read_csv(name_csv_phones_cfg,  # sep=',',
+                     dtype={'Телефон': str},
+                     converters={'ЛС': to_str, 'ПродаватьС': to_str, 'Телефон_ЛК': to_str, 'Баланс_дата': to_str,
+                                 'Подписаться': to_bool, 'ЧасКонцаТорговли': to_str, 'ЧасНачалаТорговли': to_str,
+                                 'ПродаватьДоБаланса': to_int, 'Баланс': to_float, 'Остатки_минуты': to_int,
+                                 'Остатки_Гб': to_int, 'Выставлно_Гб': to_int, 'Выставлно_минуты': to_int})
+    print(f'{name_csv_phones_cfg} строк {len(df)}')
+    print(df.head(100).to_string())
+    df = df.sort_values(by=['Активная_симка', 'Приоритет', 'Телефон'])  #
+    # except Exception:
+    #     log(f'Ошибка загрузки файла {name_csv_phones_cfg} Ошибка: {traceback.format_exc()}')
+    #     exit(0)
+    df.set_index('Телефон', inplace=True)  # переназначение индекса
+    df = df.sort_values(by=['Приоритет', 'Name'])  # .reset_index(drop = True)
+
+    var["Телефоны"] = df.to_dict('index')
+
 
 # Начало программы -------------------------------------------------------------------------------------------------------------------------------
 #             Смнетить тариф можно только звонком в Теле2 или USSD-командой: *630*(количество минут)*(количество ГБ)#
@@ -554,7 +604,7 @@ def Close_brauzers(dict_Profile_FireFox):
 # для ЯО "Мой онлайн" 250 руб, 25 ГБ, 800 минут *630*800*25#
             
 log_start()
-log('Начало')
+
 var ={'Min_count_for_sale_Гб':5, 'Min_count_for_sale_минуты':50, 'Максимальное_увеличение_количества_на_продажу':0,
       'Стоимость_1_ед_Гб':15, 'Стоимость_1_ед_минуты':0.8, 'ЧасНачалаТорговли':4, 'ЧасКонцаТорговли':1,
        'Пауза_между_выставлений_лотов_сек':500,
@@ -564,42 +614,9 @@ var ={'Min_count_for_sale_Гб':5, 'Min_count_for_sale_минуты':50, 'Мак
 
 init_branch_reestr() # загрузка настроек
 
-def load_cfg(name_csv_phones_cfg = 'phones_cfg.csv'):
-      # имя файла с настройками по телефонам
-    def to_str(var):
-        return var
-
-    def to_bool(var):
-        if type(var) != bool:
-            return False
-        return var
-
-    def to_int(var):
-        if type(var) != int:
-            return 0
-        return var
-
-    def to_float(var):
-        if type(var) != float:
-            return 0
-        return var
-    try:
-        df = pd.read_csv(name_csv_phones_cfg, #sep=',',
-                         dtype={'Телефон': str},
-                         converters={'ЛС': to_str, 'ПродаватьС':to_str, 'Телефон_ЛК': to_str, 'Баланс_дата':to_str, 'Подписаться': to_bool, 'ЧасКонцаТорговли': to_str, 'ЧасНачалаТорговли': to_str, 'ПродаватьДоБаланса': to_int, 'Баланс':to_float, 'Остатки_минуты': to_int,'Остатки_Гб': to_int,'Выставлно_Гб': to_int,'Выставлно_минуты': to_int})
-        print(df.head(100).to_string())
-        df = df.sort_values(by=['Активная_симка', 'Приоритет', 'Телефон'])  #
-    except Exception:
-        log(f'Ошибка загрузки файла {name_csv_phones_cfg} Ошибка: {traceback.format_exc()}')
-        exit(0)
-    df.set_index('Телефон', inplace=True)  # переназначение индекса
-    df = df.sort_values(by=['Приоритет', 'Name']) #.reset_index(drop = True)
-
-    var["Телефоны"] = df.to_dict('index')
-
 if __name__ == '__main__':
     Close_ather_programm()
-
+    # load_cfg2()
     load_cfg() # загрузка настроек
 
     XPATH={'xpath_phone':'//input[@id="keycloakAuth.phone"]', 'xpath_next_login' : '//button[contains(text(),"Далее")]', 'xpath_login_with_password' : '//button[text()="Вход по паролю"]',
@@ -695,7 +712,7 @@ if __name__ == '__main__':
             if brauzer == None:
                 dict_Profile_FireFox[Profile_FireFox] = restart_browser(Profile_FireFox)
                 if brauzer == None:
-                    log(f'Для {Current_phone} не удалось открыть браузер с профилем {Profile_FireFox}')
+                    log(f'Для {Current_phone} не удалось открыть браузер с профилем {os.getcwd()}\\{Profile_FireFox}')
                     sleep_or_press_keyboard(300, wait_press_keyboard = {'esc':'для досрочного продолжения'})
                     continue
 
@@ -794,7 +811,7 @@ if __name__ == '__main__':
                     log(f'Не задан день обновления баланса.')
                 else:
                     Сегодня = datetime.datetime.now()
-                    ДатаОбновленияБаланса = datetime.datetime(Сегодня.year, Сегодня.month, var["Телефоны"][Current_phone]['День_обновления_остатков'])
+                    ДатаОбновленияБаланса = datetime.datetime(Сегодня.year, Сегодня.month, int(var["Телефоны"][Current_phone]['День_обновления_остатков']))
                     if ДатаОбновленияБаланса < Сегодня: # обновление будет в следующем месяце
                         days_in_month = calendar.monthrange(ДатаОбновленияБаланса.year, ДатаОбновленияБаланса.month)[1]
                         ДатаОбновленияБаланса += datetime.timedelta(days=days_in_month)
