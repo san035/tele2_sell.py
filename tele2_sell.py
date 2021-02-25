@@ -71,6 +71,8 @@ def log(text): # no_new_line - без новой строки  , Отправи�
     return ''
 
 def wait_elements_xpath(xpath_elements, count_try_wait_max=60, find1=True, del_spec_char_from_text=True, true_if_exist_data=False):
+    # поиск xpath на странице
+
     global last_element_html, xpath_last_element_html, xpath_last_element_text
     elements = {}
     for el in xpath_elements.split(';'):
@@ -86,7 +88,7 @@ def wait_elements_xpath(xpath_elements, count_try_wait_max=60, find1=True, del_s
             if not elements[key_element]:
                 if count_try_wait == count_try_wait_max:
                     begin_log = ("Поиск %s" % key_element) if count_el != 1 or count_try_wait == 1 else ''
-                    begin_log += " попытка " + str(count_try_wait) + ' из ' + str(count_try_wait_max)
+                    begin_log += f"{key_element} попытка " + str(count_try_wait) + ' из ' + str(count_try_wait_max)
                     log(begin_log)
                 elements[key_element]=False
                 try:
@@ -115,7 +117,7 @@ def wait_elements_xpath(xpath_elements, count_try_wait_max=60, find1=True, del_s
         time.sleep(1)
         # if count_try_wait == 20:
         #     winsound.MessageBeep()
-
+    log(f'{xpath_elements} не найден.')
     return False
 
 def Not_exist_Xpath(seek_xpath, wait_sec=10): # ожидает исчезновение seek_xpath
@@ -163,6 +165,16 @@ def Close_ather_programm()->None:
         os.system(f"TASKKILL /F /IM {process_for_kill}")
     time.sleep(2)
 
+    # удаление паки temp
+    temp_folder = os.environ['temp']# d:\\temp
+    print(f'Очищение {temp_folder} от папок rust_mozprofile*')
+    for folder in os.listdir(temp_folder):
+        if folder[0:15] == 'rust_mozprofile':
+            try:
+                os.remove(temp_folder+'\\'+folder)
+            except Exception as err:
+                print(err)
+
 def init_branch_reestr(name_branch=os.path.basename(__file__)): # запустить один раз перед использованием init_branch_reestr('SkorPay')
     global branch_reestr_config
     # if not ('branch_reestr_config' in globals()):
@@ -189,7 +201,9 @@ def get_value_by_key_reestr(key_reestr, value_default=False, type_value=0):
     except:
         return value_default
 
+# запись в ресстр, тип по умолчанию - строка
 def save_value_to_reestr(key_reestr, value_to_save, type_value_in_reestr=winreg.REG_SZ):
+    # winreg.REG_SZ - строка
     # winreg.REG_DWORD    # 32-bit number.
     # winreg.REG_QWORD    # A 64-bit number.
     global branch_reestr_config
@@ -243,13 +257,13 @@ def restart_browser(profile=False):
             brauzer = webdriver.Firefox(firefox_profile=FirefoxProfile, capabilities=cap)
             return brauzer
         except Exception: # selenium.common.exceptions.WebDriverException
-            log(f'Ошибка: {traceback.format_exc()}')
+            log(f'Попытка {_try+1} из 2. Ошибка: {traceback.format_exc()}')
             # Close_brauzers(dict_Profile_FireFox)
     exit
 
 def open_url(new_url, wait_element, max_count_try=4, update=False, error_xpath=False): # открытие страницы оплаты
     global current_bank, brauzer
-    # log('Открытие %s c ожиданием элементов %s' %(new_url, wait_element))
+    log(f'Открытие {new_url} c ожиданием элементов {wait_element}')
     count_try_wait = 0
     # wait_elements = wait_element.split(';')
     while count_try_wait<max_count_try:
@@ -282,6 +296,7 @@ def click(xpath_el=None, count_try_wait_max=10):
     global xpath_last_element_html
     if xpath_el != None:
         xpath_last_element_html = xpath_el
+    log (f'Начало click {xpath_last_element_html}')
     count_try_wait=1
     while (count_try_wait <= count_try_wait_max):
         try:
@@ -312,7 +327,7 @@ def Press_Button(xpath_Button, sleep_after=0.3, wait_sec=2, try_max=3):
             time.sleep(1)
     for number_try in range(try_max):
         try:
-            if number_try>0:
+            if number_try > 0:
                 last_element_html = WebDriverWait(brauzer, 8).until(expected_conditions.element_to_be_clickable((By.XPATH, xpath_last_element_html)))
                 # el_xp(xpath_last_element_html).click()
             # else:
@@ -436,6 +451,11 @@ def sell_lots(Resource_for_sale)->int:
     """
 
     global Current_phone, brauzer, var, _today
+
+    if "" < get_value_by_key_reestr(Current_phone + '_ТафикПродан_' + Resource_for_sale, "") < _today:
+        log(f'Весь трафик {Resource_for_sale} {Current_phone} продан.')
+        return 0
+
     ОставлятьРесурса = var["Телефоны"][Current_phone].get('Оставлять_'+Resource_for_sale, -1)
     if ОставлятьРесурса == -1:
         # log (f'Ресурс {Resource_for_sale} {Current_phone} не продается.')
@@ -447,13 +467,14 @@ def sell_lots(Resource_for_sale)->int:
     Остатки_Ресурса -= ОставлятьРесурса
     if Остатки_Ресурса < var['Min_count_for_sale_'+Resource_for_sale]:
         log (f'Пакет для продажи {Resource_for_sale} {Остатки_Ресурса} меньше минимального лота {var["Min_count_for_sale_"+Resource_for_sale]}')
+        save_value_to_reestr(Current_phone + '_ТафикПродан_' + Resource_for_sale, Get_day_recharge_balans())
         return 0
 
     if brauzer.current_url != url['url_Мои_лоты'] and not open_url(url['url_'+Resource_for_sale], XPATH['Сформировать_лот_Начало'], 2):
         sleep_or_press_keyboard(600) # time.sleep(600)
         return 0
 
-    var["Телефоны"][Current_phone]['Выставлно_'+Resource_for_sale]=get_value_by_key_reestr(Current_phone+'_Выставленное_количествo_'+Resource_for_sale, 0, int)
+    var["Телефоны"][Current_phone]['Выставлно_'+Resource_for_sale]=0 #get_value_by_key_reestr(Current_phone+'_Выставленное_количествo_'+Resource_for_sale, 0, int)
     Подписаться = var["Телефоны"][Current_phone]['Подписаться']
     while  1:
         макс_количествo = Остатки_Ресурса-var["Телефоны"][Current_phone]['Выставлно_'+Resource_for_sale]
@@ -470,11 +491,15 @@ def sell_lots(Resource_for_sale)->int:
                 and Past_Value('Сформировать_лот_Поле_количествo_'+Resource_for_sale, str(количество_для_продажи)) \
                 and Press_Button('Подготовка_к_вводу_Суммы') \
                 and Past_Value('Сформировать_лот_Поле_Сумма', сумма_продажи)  \
-                and Press_Button('Кнопка_Продолжить', 3) \
+                and Press_Button('Кнопка_Продолжить', 4) \
+                and wait_elements_xpath(XPATH['Кнопка_Продолжить']+';'+XPATH['Недостаточно_трафика'], 3)\
+                and xpath_last_element_html == XPATH['Кнопка_Продолжить']\
                 and ((not Подписаться) or Press_Button('Подписаться_как', sleep_after=0.1))\
                 and Press_Button('Кнопка_Продолжить', sleep_after=1):
             # and Press_Button('Сформировать_лот_Smile2') and Press_Button('Сформировать_лот_Smile2')
             # and Press_Button('Сформировать_лот_Smile2', 0.5, 60)
+
+            #
 
             log (f'Выставлен лот {Resource_for_sale} {количество_для_продажи} осталось {макс_количествo-количество_для_продажи}')
             var["Телефоны"][Current_phone]['Выставлно_'+Resource_for_sale] += количество_для_продажи
@@ -490,7 +515,18 @@ def sell_lots(Resource_for_sale)->int:
             save_value_to_reestr(key_reestr, get_value_by_key_reestr(key_reestr, 0, int) + 1, winreg.REG_DWORD)
         else:
             log (f'Ошибка выставления лота {Resource_for_sale}')
-            var["Телефоны"][Current_phone]['ОбновитьОстатки']=True
+
+            if wait_elements_xpath(XPATH["Недостаточно_трафика"], 1):
+                #     трафик полностью продан
+                day_recharge_balans = Get_day_recharge_balans()
+                save_value_to_reestr(Current_phone + '_ТафикПродан_' + Resource_for_sale, day_recharge_balans)
+                log(f'трафик полностью продан, дата следущей продажи {day_recharge_balans}')
+                if get_value_by_key_reestr(Current_phone + '_ТафикПродан_Гб', "") == get_value_by_key_reestr(Current_phone + '_ТафикПродан_минуты', "") == day_recharge_balans:
+                    var["Телефоны"][Current_phone]['ПродаватьС']=day_recharge_balans
+                    save_value_to_reestr(Current_phone + 'ПродаватьС', day_recharge_balans)
+                    log(f'Меняется дата следущей продажи для {Current_phone} на  {day_recharge_balans}')
+            else:
+                var["Телефоны"][Current_phone]['ОбновитьОстатки']=True
             return -1
 
 def Подарить_ресурс_Гб():
@@ -585,7 +621,8 @@ def load_cfg(name_csv_phones_cfg='phones_cfg.csv')->None:
                      converters={'ЛС': to_str, 'ПродаватьС': to_str, 'Телефон_ЛК': to_str, 'Баланс_дата': to_str,
                                  'Подписаться': to_bool, 'ЧасКонцаТорговли': to_str, 'ЧасНачалаТорговли': to_str,
                                  'ПродаватьДоБаланса': to_int, 'Баланс': to_float, 'Остатки_минуты': to_int,
-                                 'Остатки_Гб': to_int, 'Выставлно_Гб': to_int, 'Выставлно_минуты': to_int})
+                                 'Остатки_Гб': to_int, 'Выставлно_Гб': to_int, 'Выставлно_минуты': to_int,
+                                 'День_обновления_остатков': to_int})
     print(f'{name_csv_phones_cfg} строк {len(df)}')
     print(df.head(100).to_string())
     df = df.sort_values(by=['Активная_симка', 'Приоритет', 'Телефон'])  #
@@ -596,6 +633,35 @@ def load_cfg(name_csv_phones_cfg='phones_cfg.csv')->None:
     df = df.sort_values(by=['Приоритет', 'Name'])  # .reset_index(drop = True)
 
     var["Телефоны"] = df.to_dict('index')
+
+# возвращает день обновления баланса строкой
+def Get_day_recharge_balans():
+    Сегодня = datetime.datetime.now()
+    day_recharge_balans = var["Телефоны"][Current_phone]['День_обновления_остатков']
+
+    # если день обновления баланса не задан, то этим днем будет завтра
+    if day_recharge_balans == 0:
+        day_recharge_balans = (Сегодня + datetime.timedelta(days=1)).day
+
+    # Проверка наличия дня в месяце, calendar.monthrange(Сегодня.year, Сегодня.month)[1] - дней в месяце
+    day_recharge_balans = min(calendar.monthrange(Сегодня.year, Сегодня.month)[1], day_recharge_balans)
+
+    ДатаОбновленияБаланса = datetime.datetime(Сегодня.year, Сегодня.month, day_recharge_balans)
+    if ДатаОбновленияБаланса < Сегодня:  # обновление будет в следующем месяце
+        days_in_month = calendar.monthrange(ДатаОбновленияБаланса.year, ДатаОбновленияБаланса.month)[1]
+        ДатаОбновленияБаланса += datetime.timedelta(days=days_in_month)
+    return str(ДатаОбновленияБаланса)[:10]
+
+
+def refresh_page():
+    for _try in range(1,2):
+        try:
+            brauzer.refresh()  # обновляем страницу
+            return True
+        except:
+            log('Ошибка обновления страицы')
+            sleep(100)
+    return False
 
 
 # Начало программы -------------------------------------------------------------------------------------------------------------------------------
@@ -646,6 +712,7 @@ if __name__ == '__main__':
            'Баланс':'//span[@class="number"]', 'Абонплата':'//p[@class="abonent-date"]',
            'Подарить_Гб_шаг1':'//span[contains(text(), "Подарить интернет")]',
            'Подарить_Гб_ввод_телефона_получателя':'//input[@id="receiverNumber"]', 'Кнопка_Подтвердить':'//div/a[contains(text(), "Подтвердить")]',
+           'Недостаточно_трафика':'//div[contains(text(), "Недостаточно трафика для размещения лота.")]'
            # <div>Превышение лимита на размещение лотов в день. Повторите попытку завтра.</div>   //div[contains(text(), "Превышение лимита на размещение лотов в день")]
            }
     url={'url_Мои_лоты':'https://yar.tele2.ru/stock-exchange/my',
@@ -688,6 +755,8 @@ if __name__ == '__main__':
         if var["Телефоны"][Current_phone].get("Баланс", None) == None:
             var["Телефоны"][Current_phone]["Баланс"]=0
 
+    dict_Profile_FireFox = {} #профиль - ссылка на браузер
+
     while True:
         count_phone_for_sale = var["Всего_на_продажу_Гб"] = var["Всего_на_продажу_минуты"] = 0
 
@@ -703,8 +772,13 @@ if __name__ == '__main__':
              sleep_or_press_keyboard(До_начала*3600)
              continue
 
-        dict_Profile_FireFox = {} #профиль - ссылка на браузер
         for Current_phone in var["Телефоны"].keys():
+            phone_enable, sell_with=var["Телефоны"][Current_phone]['Активная_симка'] , var["Телефоны"][Current_phone].get('ПродаватьС', '')
+            log(f'Переключения на {Current_phone} {var["Телефоны"][Current_phone]["Name"]} {var["Телефоны"][Current_phone]["Баланс"]}р использовать с: {sell_with} Активность:{phone_enable} ОбновитьОстатки={var["Телефоны"][Current_phone]["ОбновитьОстатки"]}')
+            phone_enable = phone_enable and var["Телефоны"][Current_phone]['ЧасНачалаТорговли'] <= hour_trade <= var["Телефоны"][Current_phone]['ЧасКонцаТорговли']
+            # ЕстьКомуДаритьГб = len(var["Кому_дарить_Гб"])>0 and Current_phone in var["Откуда_дарить_Гб"] and var["Телефоны"][Current_phone].get("Остатки_Гб", -1) != 0
+            if  (_today < sell_with) or (not phone_enable and not var["Телефоны"][Current_phone]['ОбновитьОстатки']) : # and not ЕстьКомуДаритьГб)
+                continue
 
             # запуск браузера по профилю
             Profile_FireFox = var["Телефоны"][Current_phone]['Profile_FireFox']
@@ -716,13 +790,6 @@ if __name__ == '__main__':
                     sleep_or_press_keyboard(300, wait_press_keyboard = {'esc':'для досрочного продолжения'})
                     continue
 
-            phone_enable, sell_with=var["Телефоны"][Current_phone]['Активная_симка'] , var["Телефоны"][Current_phone].get('ПродаватьС', '')
-            log(f'Начало переключения на номер {Current_phone} {var["Телефоны"][Current_phone]["Name"]} {var["Телефоны"][Current_phone]["Баланс"]}р Активность:{phone_enable} использовать с: {sell_with} ОбновитьОстатки={var["Телефоны"][Current_phone]["ОбновитьОстатки"]}')
-            phone_enable = (phone_enable and (_today >= sell_with))\
-                         and var["Телефоны"][Current_phone]['ЧасНачалаТорговли'] <= hour_trade <= var["Телефоны"][Current_phone]['ЧасКонцаТорговли']
-            ЕстьКомуДаритьГб = len(var["Кому_дарить_Гб"])>0 and Current_phone in var["Откуда_дарить_Гб"] and var["Телефоны"][Current_phone].get("Остатки_Гб", -1) != 0
-            if  not phone_enable and not var["Телефоны"][Current_phone]['ОбновитьОстатки'] and not ЕстьКомуДаритьГб:
-                continue
 
             if not open_url(url['url_lk'], XPATH['Войти']+';' + XPATH['xpath_phone'] + ';' + XPATH['Мой_Tele2'], 2):
                 sleep_or_press_keyboard(600, {'c':' -  скопировать с про'})
@@ -746,20 +813,38 @@ if __name__ == '__main__':
             if isXpath(f'//button/h1[contains(text(),"{phone_format}")]'):
                 log(f'Номер {Current_phone} уже выбран из списка.') #  управляемых номеров
             elif open_url(url['url_lk'], '//span[contains(@class, "dashboard-number__icon")]', 2, error_xpath='//div[@class="data-unavailable-message lk-new error-message"]') and click() and sleep(0.8)\
-                and click(f'//li/button/h3[contains(text(),"{phone_format}")]/..', 10) and wait_elements_xpath(f'//button/h1[contains(text(),"{phone_format}")]', 30) and wait_elements_xpath(XPATH['Баланс'], 30):
+                and click(f'//li/button/h3[contains(text(),"{phone_format}")]/..', 10)\
+                and wait_elements_xpath(f'//button/h1[contains(text(),"{phone_format}")]', 50):
+
+                # пытаемся получить баланс 3 раза
+                is_found_balans = False
+                for _try in range(1, 7):
+                    log(f'Попытка получить баланс {_try} из 7')
+                    if wait_elements_xpath(XPATH['Баланс'], 50):
+                        is_found_balans = True
+                        break
+                    refresh_page()
+                    sleep_or_press_keyboard(60)
+
+                if not is_found_balans:
+                    log(f'Не удалось переключиться на номер {Current_phone}. Переход к следущему номеру черех 3 минуты.')
+                    sleep_or_press_keyboard(180)
+                    continue
+
                 var["Телефоны"][Current_phone]['Баланс']=float(xpath_last_element_text.replace(' ', '').replace(',', '.')) #.replace('₽', '')
                 var["Телефоны"][Current_phone]['Баланс_дата'] = _today
                 log(f'Успешное переключение на номер {Current_phone} баланс {xpath_last_element_text} руб.')
 
                 # обновление Абонплата
-                if var["Телефоны"][Current_phone].get('Абонплата', 0) <= 0 and isXpath(XPATH['Абонплата']):
+                if (var["Телефоны"][Current_phone].get('Абонплата', 0) <= 0 or var["Телефоны"][Current_phone]['День_обновления_остатков'] <=0) and isXpath(XPATH['Абонплата']):
                     rez_match = re.search('(Абонентская плата )(.+)( ₽ будет списана )(\d+)', xpath_last_element_text)
                     if rez_match:
                         var["Телефоны"][Current_phone]['Абонплата'] = float(rez_match.group(2))
                         var["Телефоны"][Current_phone]['День_обновления_остатков'] = int(rez_match.group(4))
 
             else:
-                log(f'Неудалось переключиться на номер {Current_phone}. Переход к следущему номеру черех 3 минуты.')
+                log(f'Не удалось переключиться на номер {Current_phone}. Переход к следущему номеру черех 3 минуты.')
+                refresh_page() # обновляем страницу
                 sleep_or_press_keyboard(180)
                 continue
 
@@ -781,22 +866,22 @@ if __name__ == '__main__':
             else:
                 log(f'Остатки {Current_phone} без обновления: {var["Телефоны"][Current_phone]["Остатки_Гб"]} Гб {var["Телефоны"][Current_phone]["Остатки_минуты"]} минут')
 
-            if ЕстьКомуДаритьГб:
-                Подарить_ресурс_Гб()
-            else:
-                Resource = "Гб"
-                Пополнить_ресурс_кол = var["Телефоны"][Current_phone].get("Поддерживать_"+Resource, 0)
-                if 0 < Пополнить_ресурс_кол > var["Телефоны"][Current_phone]["Остатки_"+Resource]:
-                    Пополнить_ресурс_кол = max(1, int(Пополнить_ресурс_кол - var["Телефоны"][Current_phone]["Остатки_"+Resource]))
-                    log(f'Требуется пополнить {Resource} на {Пополнить_ресурс_кол}.')
-                    if not Current_phone in var["Кому_дарить_Гб"]:
-                        var["Кому_дарить_Гб"].append(Current_phone)
+            # if ЕстьКомуДаритьГб:
+            #     Подарить_ресурс_Гб()
+            # else:
+            Resource = "Гб"
+            Пополнить_ресурс_кол = var["Телефоны"][Current_phone].get("Поддерживать_"+Resource, 0)
+            if 0 < Пополнить_ресурс_кол > var["Телефоны"][Current_phone]["Остатки_"+Resource]:
+                Пополнить_ресурс_кол = max(1, int(Пополнить_ресурс_кол - var["Телефоны"][Current_phone]["Остатки_"+Resource]))
+                log(f'Требуется пополнить {Resource} на {Пополнить_ресурс_кол}.')
+                if not Current_phone in var["Кому_дарить_Гб"]:
+                    var["Кому_дарить_Гб"].append(Current_phone)
 
             if not phone_enable:
                 time.sleep(1)
                 continue
 
-            del_all_lots(40)
+            # del_all_lots(40) не удаляем с 20.01.2021
 
 
 
@@ -810,15 +895,9 @@ if __name__ == '__main__':
                 if var["Телефоны"][Current_phone].get('День_обновления_остатков', 0) == 0:
                     log(f'Не задан день обновления баланса.')
                 else:
-                    Сегодня = datetime.datetime.now()
-                    ДатаОбновленияБаланса = datetime.datetime(Сегодня.year, Сегодня.month, int(var["Телефоны"][Current_phone]['День_обновления_остатков']))
-                    if ДатаОбновленияБаланса < Сегодня: # обновление будет в следующем месяце
-                        days_in_month = calendar.monthrange(ДатаОбновленияБаланса.year, ДатаОбновленияБаланса.month)[1]
-                        ДатаОбновленияБаланса += datetime.timedelta(days=days_in_month)
-
-                    var["Телефоны"][Current_phone]['ПродаватьС'] = sell_with = str(ДатаОбновленияБаланса)[:10] #int(time.mktime(ДатаОбновленияБаланса.timetuple()))
-                    save_value_to_reestr(Current_phone+'ПродаватьС', sell_with) # , winreg.REG_DWORD
-                    log(f'Новая дата ПродаватьС для {Current_phone}: {sell_with}') #time.ctime(ПродаватьС) .strftime("%d.%m.%Y")
+                    var["Телефоны"][Current_phone]['ПродаватьС'] = sell_with = Get_day_recharge_balans()
+                    save_value_to_reestr(Current_phone+'ПродаватьС', sell_with)
+                    log(f'Новая дата ПродаватьС для {Current_phone}: {sell_with}')
 
                 log(f'Нет ресурсов для продажи. Переход к следущему номеру.\n')
                 continue
@@ -867,3 +946,4 @@ if __name__ == '__main__':
 
         log(f'Пауза {СекДоЗапуска} сек. count_phone_for_sale={count_phone_for_sale}')
         sleep_or_press_keyboard(СекДоЗапуска)
+

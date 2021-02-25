@@ -1,6 +1,6 @@
 cd /d "%~dp0"
 
-python.exe tele2_sell.py
+"C:\Program Files\Python38\python.exe" tele2_sell.py
 pause
 
 rem ���������� � ������������
